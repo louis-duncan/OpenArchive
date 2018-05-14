@@ -1,21 +1,10 @@
-__title__ = "Zetica DB"
-__author__ = "Louis Thurman"
-
 import os
-import sqlite3
 import datetime
 import easygui_custom as easygui
+import datebase_io
 
-# Define database location and test it's existence.
-DATABASE_LOCATION = "bin\\zetica.db"
-if os.path.exists(DATABASE_LOCATION):
-    conn = sqlite3.connect(DATABASE_LOCATION)
-    cursor = conn.cursor()
-    # A test to see if tables 'resources', 'resource_types', and 'local_authorities' should go here.
-    # But I haven't worked out the best way to check yet.
-else:
-    easygui.msgbox("The database could not be located.\nThe program will now exit.")
-    exit()
+__title__ = "OpenArchive"
+__author__ = "Louis Thurman"
 
 
 class Record(object):

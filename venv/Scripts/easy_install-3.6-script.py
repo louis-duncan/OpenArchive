@@ -1,4 +1,4 @@
-#!"C:\Users\louis\OneDrive\Python Projects\Zetica-DB\venv\Scripts\python.exe"
+#!C:\Users\louis\GitKraken\OpenArchive\venv\Scripts\python.exe
 # EASY-INSTALL-ENTRY-SCRIPT: 'setuptools==28.8.0','console_scripts','easy_install-3.6'
 __requires__ = 'setuptools==28.8.0'
 import re
