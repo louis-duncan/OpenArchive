@@ -40,7 +40,8 @@ class ArchiveRecord:
                 if os.path.exists(self.linked_files[file_index]):
                     fail = os.system('"{}"'.format(self.linked_files[file_index]))
                     if fail:
-                        easygui.msgbox("File {} could not be opened. Unknown error.".format(self.linked_files[file_index]))
+                        easygui.msgbox("File {} could not be opened. Unknown error.".
+                                       format(self.linked_files[file_index]))
                     else:
                         pass
                 else:
@@ -140,3 +141,7 @@ def format_returned_item(item):
                                linked_files,
                                )
     return record_obj
+
+
+def test():
+    pass
