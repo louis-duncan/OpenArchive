@@ -11,150 +11,188 @@
     <collation id="3" parent="1" name="BINARY"/>
     <collation id="4" parent="1" name="NOCASE"/>
     <collation id="5" parent="1" name="RTRIM"/>
-    <table id="6" parent="2" name="local_authorities"/>
-    <table id="7" parent="2" name="resources"/>
-    <table id="8" parent="2" name="sqlite_master">
+    <table id="6" parent="2" name="file_links"/>
+    <table id="7" parent="2" name="local_authorities"/>
+    <table id="8" parent="2" name="resources"/>
+    <table id="9" parent="2" name="sqlite_master">
       <System>1</System>
     </table>
-    <table id="9" parent="2" name="sqlite_sequence">
+    <table id="10" parent="2" name="sqlite_sequence">
       <System>1</System>
     </table>
-    <table id="10" parent="2" name="types"/>
-    <column id="11" parent="6" name="id">
+    <table id="11" parent="2" name="types"/>
+    <column id="12" parent="6" name="id">
       <Position>1</Position>
       <DataType>integer|0s</DataType>
       <NotNull>1</NotNull>
       <SequenceIdentity>1</SequenceIdentity>
     </column>
-    <column id="12" parent="6" name="local_auth">
+    <column id="13" parent="6" name="record_id">
       <Position>2</Position>
+      <DataType>int|0s</DataType>
+    </column>
+    <column id="14" parent="6" name="file_path">
+      <Position>3</Position>
       <DataType>varchar|0s</DataType>
       <NotNull>1</NotNull>
     </column>
-    <index id="13" parent="6" name="local_auths_id_uindex">
+    <index id="15" parent="6" name="file_links_id_uindex">
       <ColNames>id</ColNames>
       <ColumnCollations></ColumnCollations>
       <Unique>1</Unique>
     </index>
-    <index id="14" parent="6" name="local_auths_local_auth_uindex">
+    <key id="16" parent="6">
+      <ColNames>id</ColNames>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>file_links_id_uindex</UnderlyingIndexName>
+    </key>
+    <foreign-key id="17" parent="6" name="file_links_resources_id_fk">
+      <ColNames>record_id</ColNames>
+      <RefTableName>resources</RefTableName>
+      <RefColNames>id</RefColNames>
+    </foreign-key>
+    <column id="18" parent="7" name="id">
+      <Position>1</Position>
+      <DataType>integer|0s</DataType>
+      <NotNull>1</NotNull>
+      <SequenceIdentity>1</SequenceIdentity>
+    </column>
+    <column id="19" parent="7" name="local_auth">
+      <Position>2</Position>
+      <DataType>varchar|0s</DataType>
+      <NotNull>1</NotNull>
+    </column>
+    <index id="20" parent="7" name="local_auths_id_uindex">
+      <ColNames>id</ColNames>
+      <ColumnCollations></ColumnCollations>
+      <Unique>1</Unique>
+    </index>
+    <index id="21" parent="7" name="local_auths_local_auth_uindex">
       <ColNames>local_auth</ColNames>
       <ColumnCollations></ColumnCollations>
       <Unique>1</Unique>
     </index>
-    <key id="15" parent="6">
+    <key id="22" parent="7">
       <ColNames>id</ColNames>
       <Primary>1</Primary>
       <UnderlyingIndexName>local_auths_id_uindex</UnderlyingIndexName>
     </key>
-    <column id="16" parent="7" name="id">
+    <column id="23" parent="8" name="id">
+      <Position>1</Position>
+      <DataType>INTEGER|0s</DataType>
+      <NotNull>1</NotNull>
+      <SequenceIdentity>1</SequenceIdentity>
+    </column>
+    <column id="24" parent="8" name="title">
+      <Position>2</Position>
+      <DataType>VARCHAR|0s</DataType>
+      <NotNull>1</NotNull>
+    </column>
+    <column id="25" parent="8" name="description">
+      <Position>3</Position>
+      <DataType>VARCHAR|0s</DataType>
+    </column>
+    <column id="26" parent="8" name="record_type">
+      <Position>4</Position>
+      <DataType>INTEGER|0s</DataType>
+      <NotNull>1</NotNull>
+    </column>
+    <column id="27" parent="8" name="local_auth">
+      <Position>5</Position>
+      <DataType>INTEGER|0s</DataType>
+      <NotNull>1</NotNull>
+    </column>
+    <column id="28" parent="8" name="start_date">
+      <Position>6</Position>
+      <DataType>DATE|0s</DataType>
+    </column>
+    <column id="29" parent="8" name="end_date">
+      <Position>7</Position>
+      <DataType>DATE|0s</DataType>
+    </column>
+    <column id="30" parent="8" name="physical_ref">
+      <Position>8</Position>
+      <DataType>VARCHAR|0s</DataType>
+    </column>
+    <column id="31" parent="8" name="other_ref">
+      <Position>9</Position>
+      <DataType>VARCHAR|0s</DataType>
+    </column>
+    <column id="32" parent="8" name="tags">
+      <Position>10</Position>
+      <DataType>VARCHAR|0s</DataType>
+    </column>
+    <index id="33" parent="8" name="resources_1_id_uindex">
+      <ColNames>id</ColNames>
+      <ColumnCollations></ColumnCollations>
+      <Unique>1</Unique>
+    </index>
+    <key id="34" parent="8">
+      <ColNames>id</ColNames>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>resources_1_id_uindex</UnderlyingIndexName>
+    </key>
+    <foreign-key id="35" parent="8" name="resources_file_links_record_id_fk">
+      <ColNames>id</ColNames>
+      <RefTableName>file_links</RefTableName>
+      <RefColNames>record_id</RefColNames>
+    </foreign-key>
+    <foreign-key id="36" parent="8" name="resources_types_id_fk">
+      <ColNames>record_type</ColNames>
+      <RefTableName>types</RefTableName>
+      <RefColNames>id</RefColNames>
+    </foreign-key>
+    <foreign-key id="37" parent="8" name="resources_local_authorities_id_fk">
+      <ColNames>local_auth</ColNames>
+      <RefTableName>local_authorities</RefTableName>
+      <RefColNames>id</RefColNames>
+    </foreign-key>
+    <column id="38" parent="9" name="type">
+      <Position>1</Position>
+      <DataType>text|0s</DataType>
+    </column>
+    <column id="39" parent="9" name="name">
+      <Position>2</Position>
+      <DataType>text|0s</DataType>
+    </column>
+    <column id="40" parent="9" name="tbl_name">
+      <Position>3</Position>
+      <DataType>text|0s</DataType>
+    </column>
+    <column id="41" parent="9" name="rootpage">
+      <Position>4</Position>
+      <DataType>integer|0s</DataType>
+    </column>
+    <column id="42" parent="9" name="sql">
+      <Position>5</Position>
+      <DataType>text|0s</DataType>
+    </column>
+    <column id="43" parent="10" name="name">
+      <Position>1</Position>
+    </column>
+    <column id="44" parent="10" name="seq">
+      <Position>2</Position>
+    </column>
+    <column id="45" parent="11" name="id">
       <Position>1</Position>
       <DataType>integer|0s</DataType>
       <NotNull>1</NotNull>
       <SequenceIdentity>1</SequenceIdentity>
     </column>
-    <column id="17" parent="7" name="title">
+    <column id="46" parent="11" name="type_text">
       <Position>2</Position>
       <DataType>varchar|0s</DataType>
       <NotNull>1</NotNull>
     </column>
-    <column id="18" parent="7" name="description">
-      <Position>3</Position>
-      <DataType>varchar|0s</DataType>
-    </column>
-    <column id="19" parent="7" name="record_type">
-      <Position>4</Position>
-      <DataType>int|0s</DataType>
-      <NotNull>1</NotNull>
-    </column>
-    <column id="20" parent="7" name="local_auth">
-      <Position>5</Position>
-      <DataType>int|0s</DataType>
-      <NotNull>1</NotNull>
-    </column>
-    <column id="21" parent="7" name="start_date">
-      <Position>6</Position>
-      <DataType>date|0s</DataType>
-    </column>
-    <column id="22" parent="7" name="end_date">
-      <Position>7</Position>
-      <DataType>date|0s</DataType>
-    </column>
-    <column id="23" parent="7" name="physical_ref">
-      <Position>8</Position>
-      <DataType>varchar|0s</DataType>
-    </column>
-    <column id="24" parent="7" name="other_ref">
-      <Position>9</Position>
-      <DataType>varchar|0s</DataType>
-    </column>
-    <column id="25" parent="7" name="tags">
-      <Position>10</Position>
-      <DataType>varchar|0s</DataType>
-    </column>
-    <column id="26" parent="7" name="linked_files">
-      <Position>11</Position>
-      <DataType>varchar|0s</DataType>
-    </column>
-    <index id="27" parent="7" name="resources_id_uindex">
+    <index id="47" parent="11" name="types_id_uindex">
       <ColNames>id</ColNames>
       <ColumnCollations></ColumnCollations>
       <Unique>1</Unique>
     </index>
-    <key id="28" parent="7">
+    <key id="48" parent="11">
       <ColNames>id</ColNames>
       <Primary>1</Primary>
-      <UnderlyingIndexName>resources_id_uindex</UnderlyingIndexName>
+      <UnderlyingIndexName>types_id_uindex</UnderlyingIndexName>
     </key>
-    <foreign-key id="29" parent="7" name="resources_types_id_fk">
-      <ColNames>record_type</ColNames>
-      <RefTableName>types</RefTableName>
-      <RefColNames>id</RefColNames>
-    </foreign-key>
-    <foreign-key id="30" parent="7" name="resources_local_auths_id_fk">
-      <ColNames>local_auth</ColNames>
-      <RefTableName>local_auths</RefTableName>
-      <RefColNames>id</RefColNames>
-    </foreign-key>
-    <column id="31" parent="8" name="type">
-      <Position>1</Position>
-      <DataType>text|0s</DataType>
-    </column>
-    <column id="32" parent="8" name="name">
-      <Position>2</Position>
-      <DataType>text|0s</DataType>
-    </column>
-    <column id="33" parent="8" name="tbl_name">
-      <Position>3</Position>
-      <DataType>text|0s</DataType>
-    </column>
-    <column id="34" parent="8" name="rootpage">
-      <Position>4</Position>
-      <DataType>integer|0s</DataType>
-    </column>
-    <column id="35" parent="8" name="sql">
-      <Position>5</Position>
-      <DataType>text|0s</DataType>
-    </column>
-    <column id="36" parent="9" name="name">
-      <Position>1</Position>
-    </column>
-    <column id="37" parent="9" name="seq">
-      <Position>2</Position>
-    </column>
-    <column id="38" parent="10" name="id">
-      <Position>1</Position>
-      <DataType>integer|0s</DataType>
-      <NotNull>1</NotNull>
-    </column>
-    <column id="39" parent="10" name="type_text">
-      <Position>2</Position>
-      <DataType>varchar|0s</DataType>
-      <NotNull>1</NotNull>
-    </column>
-    <index id="40" parent="10" name="types_id_uindex">
-      <ColNames>id</ColNames>
-      <ColumnCollations></ColumnCollations>
-      <Unique>1</Unique>
-    </index>
   </database-model>
 </dataSource>

@@ -81,14 +81,18 @@ def get_filtered_records(types=(), local_authorities=()):
     types_param_string = types_param_string.strip(",")
 
     local_authorities_string = ""
+    #
     for l in local_authorities:
         local_authorities_string += str(l) + ","
     local_authorities_string = local_authorities_string.strip(",")
 
     q = "SELECT * FROM resources WHERE record_type IN ({}) OR local_auth IN ({})".format(types_param_string,
                                                                                          local_authorities_string)
-
-    return bliss.all(q, ())
+    records =  bliss.all(q, ())
+    formatted_records = []
+    for r in records:
+        formatted_records.append(format_returned_item(r))
+    return formatted_records
 
 
 def format_returned_item(item):
@@ -108,24 +112,15 @@ def format_returned_item(item):
 
     # Create tag and item lists
     if item.tags is not None:
-        tags = item.tags.split("|")
-        null_count = tags.count("")
-        for n in range(null_count):
+        tags = item.tags.split(",")
+        while tags.count("") > 0:
             tags.remove("")
-        for i in range(len(tags)):
-            tags[i] = tags[i].strip("'")
     else:
         tags = None
 
-    if item.linked_files is not None:
-        linked_files = item.linked_files.split("|")
-        null_count = linked_files.count("")
-        for n in range(null_count):
-            linked_files.remove("")
-        for i in range(len(linked_files)):
-            linked_files[i] = linked_files[i].strip("'")
-    else:
-        linked_files = None
+    linked_files = []
+    for f in bliss.all("SELECT * FROM file_links WHERE record_id=?", (item.id,)):
+        linked_files.append(f.file_path)
 
     # Create Record obj
     record_obj = ArchiveRecord(item.id,
@@ -143,5 +138,3 @@ def format_returned_item(item):
     return record_obj
 
 
-def test():
-    pass
