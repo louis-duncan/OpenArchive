@@ -10,7 +10,6 @@ __author__ = "Louis Thurman"
 
 def main_menu():
     run = True
-    choices = ()
+    choices = ("Add ")
     while run:
         choice = easygui.buttonbox()
-
