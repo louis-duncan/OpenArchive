@@ -2,7 +2,7 @@ import os
 import sqlite3
 import sql
 import datetime
-import easygui_custom as easygui
+import easygui
 
 
 class ArchiveRecord:

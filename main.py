@@ -1,7 +1,7 @@
 import os
 import datetime
 import easygui
-import datebase_io
+import database_io
 import im2pdf_fix.im2pdf as im2pdf
 
 __title__ = "OpenArchive"
@@ -37,12 +37,23 @@ def join_files():
 
 
 def quick_search():
-    pass
     # todo: Write quick search
+    # Get user input
+    msg = "Enter Search Terms:"
+    user_input = easygui.enterbox(msg, __title__ + " - Quick Search")
+    if user_input is None:
+        pass
+    else:
+        pass
+        # Perform search
+        # Display results
 
 
 def detailed_search():
     pass
+    # Get user input.
+    # Perform search.
+    # Display results.
     # todo: Write detailed search
 
 
@@ -58,12 +69,13 @@ def access_user_list():
 
 def main_menu():
     run = True
-    choices = ("Quick\nSearch", "Detailed\nSearch", "Upload\nFiles", "My List")
+    choices = ["Quick\n   Search   ", "Detailed\n   Search   ", "   Upload   \nFiles", "My\n     List     "]
     msg = """- Welcome to OpenArchive -
+    
 Database File: {}
-Archive Location: {}""".format(datebase_io.DATABASE_LOCATION, datebase_io.DATA_LOCATION)
+Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.DATA_LOCATION)
     while run:
-        choice = easygui.buttonbox()
+        choice = easygui.buttonbox(msg, __title__, choices, )
         if choice is None:
             break
         elif choice == choices[0]:
@@ -74,6 +86,8 @@ Archive Location: {}""".format(datebase_io.DATABASE_LOCATION, datebase_io.DATA_L
             upload_agent()
         elif choice == choices[3]:
             access_user_list()
+        else:
+            pass
 
 
 if __name__ == "__main__":
