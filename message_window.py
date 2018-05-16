@@ -2,14 +2,21 @@ import os
 import time
 import argparse
 
-os.system("title OpenArchive")
-os.system("mode con: cols=35 lines=3")
-os.system("color F0")
-
 text_location = "bin\\temp\\message.dat"
 
+
+def close():
+    message_file = open(text_location, "w")
+    message_file.write("exit")
+    message_file.close()
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deiplay message from file")
+    os.system("title OpenArchive")
+    os.system("mode con: cols=35 lines=3")
+    os.system("color F0")
+
+    parser = argparse.ArgumentParser(description="Display message from file")
     parser.add_argument("-m", "--message", default="Loading...")
     args = vars(parser.parse_args())
 

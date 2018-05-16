@@ -4,6 +4,7 @@ import im2pdf_fix.im2pdf
 import database_io
 import temp
 from PIL import Image
+import message_window
 
 __title__ = "OpenArchive - Upload Agent"
 __author__ = "Louis Thurman"
@@ -11,7 +12,7 @@ __author__ = "Louis Thurman"
 
 def fill_new_record(file_path):
 
-    choices = ["Add/Edit\nInformation", "Set Record\nType", "Set Local\nAuthority", "\nUpload!\n"]
+    choices = ["Add/Edit\nInformation", "Set Record\nType", "Set Local\nAuthority", "\nUpload!\n", "Cancel"]
 
     edit_msg = "* = required"
     fields = ["Title:",
@@ -31,7 +32,7 @@ def fill_new_record(file_path):
             "tag1, tag2, etc"
             ]
     while True:
-        view_msg = ""
+        # Generate Thumbnail from selected image
         file_type = file_path.split(".")[-1].upper()
         if file_type in ("JPG",
                          "JPEG",
@@ -41,13 +42,16 @@ def fill_new_record(file_path):
             fd, thumb_file = temp.mkstemp(suffix=".jpg", dir=os.environ["TEMP"])
             os.close(fd)
             im = Image.open(file_path)
-            im.thumbnail((800, 300), Image.ANTIALIAS)
+            im.thumbnail((800, 200), Image.ANTIALIAS)
             im.save(thumb_file, "JPEG")
             im.close()
         else:
-            thumb_file = "..\\bin\\no_thumb.jpg"
+            thumb_file = ".\\bin\\no_thumb.jpg"
+
+        view_msg = ""
+
         choice = easygui.buttonbox(view_msg, __title__ + " - New Record", choices, thumb_file)
-        if choice is None:
+        if choice is None or choice == "Cancel":
             break
         elif choice == [0]:
             info = easygui.multenterbox(edit_msg,
@@ -55,6 +59,9 @@ def fill_new_record(file_path):
                                         fields,
                                         info
                                         )
+        # Todo: finish adding choices.
+        elif choice not in choices:
+            os.startfile(file_path)
         else:
             pass
 
