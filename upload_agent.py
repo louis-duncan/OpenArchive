@@ -3,6 +3,7 @@ import os
 import im2pdf_fix.im2pdf
 import database_io
 import temp
+from PIL import Image
 
 __title__ = "OpenArchive - Upload Agent"
 __author__ = "Louis Thurman"
@@ -30,7 +31,20 @@ def fill_new_record(file_path):
             ]
     while True:
         view_msg = ""
-        thumb_file =
+        file_type = file_path.split(".")[-1].upper()
+        if file_type in ("JPG",
+                         "JPEG",
+                         "BMP",
+                         "PNG",
+                         ):
+            fd, thumb_file = temp.mkstemp(suffix=".jpg", dir=os.environ["TEMP"])
+            os.close(fd)
+            im = Image.open(file_path)
+            im.thumbnail((800, 300), Image.ANTIALIAS)
+            im.save(thumb_file, "JPEG")
+            im.close()
+        else:
+            thumb_file = "..\\bin\\no_thumb.jpg"
         choice = easygui.buttonbox(view_msg, __title__ + " - New Record", choices, thumb_file)
         if choice is None:
             break
