@@ -10,6 +10,7 @@ __author__ = "Louis Thurman"
 
 
 def fill_new_record(file_path):
+
     choices = ["Add/Edit\nInformation", "Set Record\nType", "Set Local\nAuthority", "\nUpload!\n"]
 
     edit_msg = "* = required"
@@ -61,14 +62,16 @@ def fill_new_record(file_path):
 def upload_single_file(part=False):
     # todo Write single upload
     # Select file
-
     file_path = easygui.fileopenbox("",
                                     __title__ + " - File Upload",
                                     default=os.path.join(os.environ["userprofile"], "*"))
-    # Get info
+
+    # Get Info
     record_info = fill_new_record(file_path)
     # Add to archive
+    # add thumbnail to archive
     # Add to DB
+    # add thumbnail to db
     # Offer deletion on completion
     pass
 
