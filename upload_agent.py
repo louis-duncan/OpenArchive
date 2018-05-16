@@ -2,18 +2,60 @@ import easygui
 import os
 import im2pdf_fix.im2pdf
 import database_io
+import temp
 
 __title__ = "OpenArchive - Upload Agent"
 __author__ = "Louis Thurman"
 
 
-def upload_single_file():
+def fill_new_record(file_path):
+    choices = ["Add/Edit\nInformation", "Set Record\nType", "Set Local\nAuthority", "\nUpload!\n"]
+
+    edit_msg = "* = required"
+    fields = ["Title:",
+              "Description:",
+              "Start Date:",
+              "End Date:",
+              "Physical Ref:",
+              "Other Ref:",
+              "Tags:"
+              ]
+    info = ["*",
+            "",
+            "DD/MM/YY",
+            "DD/MM/YY",
+            "",
+            "",
+            "tag1, tag2, etc"
+            ]
+    while True:
+        view_msg = ""
+        thumb_file =
+        choice = easygui.buttonbox(view_msg, __title__ + " - New Record", choices, thumb_file)
+        if choice is None:
+            break
+        elif choice == [0]:
+            info = easygui.multenterbox(edit_msg,
+                                        __title__ + " - Edit Record",
+                                        fields,
+                                        info
+                                        )
+        else:
+            pass
+
+
+def upload_single_file(part=False):
     # todo Write single upload
     # Select file
-    # Offer deletion on completion
+
+    file_path = easygui.fileopenbox("",
+                                    __title__ + " - File Upload",
+                                    default=os.path.join(os.environ["userprofile"], "*"))
     # Get info
+    record_info = fill_new_record(file_path)
     # Add to archive
     # Add to DB
+    # Offer deletion on completion
     pass
 
 

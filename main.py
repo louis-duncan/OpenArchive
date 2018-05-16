@@ -63,7 +63,7 @@ def launch_upload_agent():
     upload_agent.main_menu()
 
 
-def access_user_list():
+def access_users_list():
     pass
     # Write access to users list
 
@@ -85,7 +85,7 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.DATA_L
         elif choice == choices[2]:
             launch_upload_agent()
         elif choice == choices[3]:
-            access_user_list()
+            access_users_list()
         else:
             pass
 
