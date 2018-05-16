@@ -139,3 +139,9 @@ def format_returned_item(item):
     return record_obj
 
 
+def return_types():
+    type_records = bliss.all("SELECT * FROM types", ())
+    types = []
+    for r in type_records:
+        types.append(r.type_text)
+    return types
