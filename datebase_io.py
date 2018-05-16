@@ -53,6 +53,7 @@ class ArchiveRecord:
 
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"
+DATA_LOCATION = os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
 if os.path.exists(DATABASE_LOCATION):
     conn = sqlite3.connect(DATABASE_LOCATION)
     bliss = sql.SQL(conn)
