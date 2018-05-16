@@ -2,6 +2,7 @@ import os
 import datetime
 import easygui
 import database_io
+import upload_agent
 import im2pdf_fix.im2pdf as im2pdf
 
 __title__ = "OpenArchive"
@@ -57,9 +58,9 @@ def detailed_search():
     # todo: Write detailed search
 
 
-def upload_agent():
-    pass
+def launch_upload_agent():
     # Launch upload agent
+    upload_agent.main_menu()
 
 
 def access_user_list():
@@ -68,13 +69,12 @@ def access_user_list():
 
 
 def main_menu():
-    run = True
     choices = ["Quick\n   Search   ", "Detailed\n   Search   ", "   Upload   \nFiles", "My\n     List     "]
     msg = """- Welcome to OpenArchive -
     
 Database File: {}
 Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.DATA_LOCATION)
-    while run:
+    while True:
         choice = easygui.buttonbox(msg, __title__, choices, )
         if choice is None:
             break
@@ -83,7 +83,7 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.DATA_L
         elif choice == choices[1]:
             detailed_search()
         elif choice == choices[2]:
-            upload_agent()
+            launch_upload_agent()
         elif choice == choices[3]:
             access_user_list()
         else:
