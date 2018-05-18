@@ -15,7 +15,7 @@ import PIL.Image
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import os
 import argparse
-from progressist import ProgressBar
+#from progressist import ProgressBar
 import easygui
 import temp
 
