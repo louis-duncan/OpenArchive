@@ -1,4 +1,4 @@
-<h>OpenArchive<\h>
+<h>OpenArchive
   
 OpenArchive is intended as a Digital Media Archiving System capable of indexing a large quantity of records linking to files stored on a shared drive.
 
