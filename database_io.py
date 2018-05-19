@@ -266,3 +266,21 @@ def get_thumbnail(file_link_id=None, file_path=None):
         return None
     else:
         return thumbnail_record.thumbnailpath
+
+def clear_cache():
+    temp_files = os.listdir(TEMP_FILES_LOCATION)
+    fails = []
+    for f in temp_files:
+        try:
+            if f.endswith('.dat'):
+                data = access_bin_file(f)
+                if data.unsaved_changes:
+                    pass
+                else:
+                    os.remove(f)
+            else:
+                os.remove(f)
+        except AccessError:
+            fails.append(f)
+    return fails
+          
