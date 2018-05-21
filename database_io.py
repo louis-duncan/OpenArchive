@@ -153,13 +153,13 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 def access_bin_file(filename):
     """Accesses a '.dat' binary file."""
-    try: #Tries to access the file normally
-        #If unsuccessful due to non-existent file resort to 'except' statement
+    try:  # Tries to access the file normally
+        # If unsuccessful due to non-existent file resort to 'except' statement
         file = open(filename, "br")
         data = pickle.load(file)
         file.close()
     except FileNotFoundError:
-        #Creates empty file and returns 'None'
+        # Creates empty file and returns 'None'
         data = None
         file = open(filename, "bw")
         pickle.dump(data, file)
@@ -169,7 +169,7 @@ def access_bin_file(filename):
 
 def save_bin_file(filename,data):
     """Saves to a '.dat' binary file"""
-    file = open(filename, "bw") #If file doesn't exists it is created with the file-name given
+    file = open(filename, "bw")  # If file doesn't exists it is created with the file-name given
     pickle.dump(data, file)
     file.close()
 
@@ -304,21 +304,30 @@ def get_thumbnail(file_link_id=None, file_path=None):
     else:
         return thumbnail_record.thumbnailpath
 
+
 def clear_cache():
-    temp_files = os.listdir(TEMP_FILES_LOCATION)
+    temp_files = os.listdir(TEMP_DATA_LOCATION)
+    print("Clearing {} files from:\n{}".format(len(temp_files), TEMP_DATA_LOCATION))
     fails = []
     for f in temp_files:
+        full_f = os.path.join(TEMP_DATA_LOCATION, f)
+
         try:
-            if f.endswith('.dat'):
-                data = access_bin_file(f)
-                if data.unsaved_changes:
-                    pass
-                else:
-                    os.remove(f)
+            if full_f.endswith('.dat'):
+                try:
+                    data = access_bin_file(full_f)
+                    if data.unsaved_changes:
+                        pass
+                    else:
+                        os.remove(full_f)
+                except AttributeError or EOFError:
+                    os.remove(full_f)
             else:
-                os.remove(f)
-        except AccessError:
-            fails.append(f)
+                os.remove(full_f)
+        except PermissionError:
+            fails.append(full_f)
+        except FileNotFoundError:
+            pass
     return fails
           
 
@@ -338,9 +347,4 @@ def create_cached_record(record_id=None):
 
 def commit_record():
     # Commits changes or new record to db
-    pass
-
-
-def clear_up():
-    # Will clear the temp folder
     pass
