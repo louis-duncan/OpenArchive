@@ -8,7 +8,7 @@ import temp
 
 __title__ = "OpenArchive"
 
-valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?# \n\t"
+valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?*# \n\t"
 
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"
@@ -303,6 +303,16 @@ def get_thumbnail(file_link_id=None, file_path=None):
         return None
     else:
         return thumbnail_record.thumbnailpath
+
+
+def format_search_string(search_string):
+    special_chars = [".", "^", "$", "+", "{"]
+    formatted_string = search_string.upper()
+    for c in special_chars:
+        formatted_string = formatted_string.replace(c, "\\" + c)
+    formatted_string = formatted_string.replace("?", ".")
+    formatted_string = formatted_string.replace("*", ".*?")
+    return formatted_string
 
 
 def clear_cache():
