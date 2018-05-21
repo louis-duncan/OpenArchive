@@ -1,10 +1,12 @@
 import os
+import re
 import sqlite3
 import sql
 import datetime
 import easygui
 import pickle
 import temp
+import textdistance
 
 __title__ = "OpenArchive"
 
@@ -424,3 +426,63 @@ def commit_record(cached_record_path=None, record_obj=None):
         bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?, end_date=?,"
                   "physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=? WHERE id=?", params)
     conn.commit()
+
+
+def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
+    if (resource_type is None) and (local_auth is None):
+        base_list = bliss.all("SELECT * FROM resources", [])
+    elif (resource_type is not None) and (local_auth is None):
+        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type,])
+    elif (resource_type is None) and (local_auth is not None):
+        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth,])
+    else:
+        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
+                              (local_auth, resource_type))
+    scored_results = score_results(base_list, text, start_date, end_date)
+    return scored_results
+
+
+def score_results(results, text, start_date, end_date):
+    scores = []
+    r: ArchiveRecord
+    for r in results:
+        # Gen score
+        title_similarity = textdistance.levenshtein.normalized_similarity(text, r.title)
+        key_words = text.upper().split(" ")
+        if text not in key_words:
+            key_words.append(text.upper())
+        key_word_hits = 0
+        physical_index_hit = False
+        other_ref_hit = False
+        for k in key_words:
+            formatted = format_search_string(k)
+            if re.search(formatted, r.title) is not None:
+                key_word_hits += 1
+            else:
+                pass
+            if re.search(formatted, r.description) is not None:
+                key_word_hits += 1
+            else:
+                pass
+            for t in r.tags:
+                if re.search(formatted, t) is not None:
+                    key_word_hits += 1
+                else:
+                    pass
+            if re.search(formatted, r.physical_index) is not None:
+                physical_index_hit = True
+            else:
+                pass
+            if re.search(formatted, r.other_ref) is not None:
+                other_ref_hit = True
+            else:
+                pass
+            # Todo Add Date Checks
+
+        score = float(title_similarity * key_word_hits * int(physical_index_hit) * int(other_ref_hit))
+        if score == 0.0:
+            pass
+        else:
+            scores.append((r, score))
+    scores.sort(key=lambda s: s[1])
+    return scores
