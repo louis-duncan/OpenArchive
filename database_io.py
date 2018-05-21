@@ -3,22 +3,37 @@ import sqlite3
 import sql
 import datetime
 import easygui
+import pickle
+import temp
 
 __title__ = "OpenArchive"
 
-valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?# \n\t"
+# noinspection SpellCheckingInspection
+valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?*# \n\t"
 
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"
 ARCHIVE_LOCATION = os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
+TEMP_DATA_LOCATION = os.path.join(os.environ["TEMP"], "OpenArchive")
+
 if os.path.exists(DATABASE_LOCATION):
     conn = sqlite3.connect(DATABASE_LOCATION)
     bliss = sql.SQL(conn)
     # A test to see if tables 'resources', 'resource_types', and 'local_authorities' should go here.
     # But I haven't worked out the best way to check yet.
 else:
-    easygui.msgbox("The database could not be located.\nThe program will now exit.")
+    easygui.msgbox("The database could not be located.\n{}\n\nThe program will now exit."
+                   .format(DATABASE_LOCATION))
     exit()
+if os.path.exists(ARCHIVE_LOCATION):
+    pass
+else:
+    easygui.msgbox("The data repository could not be located.\n{}\n\nThe program will now exit."
+                   .format(ARCHIVE_LOCATION))
+if os.path.exists(TEMP_DATA_LOCATION):
+    pass
+else:
+    os.mkdir(TEMP_DATA_LOCATION)
 
 
 class ArchiveRecord:
@@ -36,7 +51,9 @@ class ArchiveRecord:
     thumb_files = []
     created_by = ""
     created_time = datetime.datetime
+    unsaved_changes = False
 
+    # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type="", local_auth="",
                  start_date=None, end_date=None, physical_index="", other_ref="", tags=[], linked_files=[],
                  thumb_files=[], created_by="", created_time=None):
@@ -71,7 +88,8 @@ class ArchiveRecord:
                     easygui.msgbox("File {} could not be opened. Path does not exist."
                                    .format(self.linked_files[file_index]))
             except IndexError:
-                easygui.msgbox("No file in record {} ({}) with index {}.".format(self.record_id, self.title, file_index))
+                easygui.msgbox("No file in record {} ({}) with index {}.".format(self.record_id,
+                                                                                 self.title, file_index))
 
     def start_date_string(self, date_to_add=None):
         if (date_to_add is None) or (date_to_add == ""):
@@ -137,6 +155,31 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
                     self.tags.append(p)
 
 
+def access_bin_file(filename):
+    """Accesses a '.dat' binary file."""
+    try:  # Tries to access the file normally
+        # If unsuccessful due to non-existent file resort to 'except' statement
+        file = open(filename, "br")
+        data = pickle.load(file)
+        file.close()
+    except FileNotFoundError:
+        # Creates empty file and returns 'None'
+        data = None
+        file = open(filename, "bw")
+        pickle.dump(data, file)
+        file.close()
+    except EOFError:
+        return False
+    return data
+
+
+def save_bin_file(filename, data):
+    """Saves to a '.dat' binary file"""
+    file = open(filename, "bw")  # If file doesn't exists it is created with the file-name given
+    pickle.dump(data, file)
+    file.close()
+
+
 def check_text_is_valid(text):
     if text is None:
         return True
@@ -160,7 +203,10 @@ def get_record_by_id(record_id=0):
         return None
     else:
         item = bliss.one("SELECT * FROM resources WHERE id=?", (record_id,))
-        return format_returned_item(item)
+        if item is None:
+            return None
+        else:
+            return format_sql_to_record_obj(item)
 
 
 def get_filtered_records(types=(), local_authorities=()):
@@ -180,14 +226,14 @@ def get_filtered_records(types=(), local_authorities=()):
 
     q = "SELECT * FROM resources WHERE record_type IN ({}) OR local_auth IN ({})".format(types_param_string,
                                                                                          local_authorities_string)
-    records =  bliss.all(q, ())
+    records = bliss.all(q, ())
     formatted_records = []
     for r in records:
-        formatted_records.append(format_returned_item(r))
+        formatted_records.append(format_sql_to_record_obj(r))
     return formatted_records
 
 
-def format_returned_item(db_record_object):
+def format_sql_to_record_obj(db_record_object):
     # Convert Type and Auth ids to text.
     type_text = bliss.one("SELECT * FROM types WHERE id=?", (db_record_object.record_type,)).type_text
     auth_text = bliss.one("SELECT * FROM local_authorities WHERE id=?", (db_record_object.local_auth,)).local_auth
@@ -221,7 +267,7 @@ def format_returned_item(db_record_object):
         thumb_files.append(f.thumbnail_path)
 
     # Create Record obj
-    record_obj = ArchiveRecord(id=db_record_object.id,
+    record_obj = ArchiveRecord(record_id=db_record_object.id,
                                title=db_record_object.title,
                                description=db_record_object.description,
                                record_type=type_text,
@@ -237,6 +283,44 @@ def format_returned_item(db_record_object):
                                created_time=created_time,
                                )
     return record_obj
+
+
+def format_record_obj_to_sql(record_obj: ArchiveRecord):
+    if record_obj is None:
+        return None
+    else:
+        pass
+        record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?", (record_obj.record_type,)))
+        local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?", (record_obj.local_auth,)))
+        if record_obj.start_date is None:
+            start_date_stamp = None
+        else:
+            start_date_stamp = int(record_obj.start_date.timestamp() * 1000)
+        if record_obj.start_date is None:
+            end_date_stamp = None
+        else:
+            end_date_stamp = int(record_obj.end_date.timestamp() * 1000)
+        if record_obj.created_time is None:
+            created_time_stamp = None
+        else:
+            created_time_stamp = int(record_obj.created_time.timestamp() * 1000)
+        tags_string = ""
+        for t in record_obj.tags:
+            tags_string += str(t) + "|"
+        tags_string = tags_string.strip("|")
+        record_list = [record_obj.title,
+                       record_obj.description,
+                       record_type_id,
+                       local_auth_id,
+                       start_date_stamp,
+                       end_date_stamp,
+                       record_obj.physical_index,
+                       record_obj.other_ref,
+                       tags_string,
+                       record_obj.created_by,
+                       created_time_stamp
+                       ]
+        return record_obj.record_id, record_list
 
 
 def return_types():
@@ -267,20 +351,76 @@ def get_thumbnail(file_link_id=None, file_path=None):
     else:
         return thumbnail_record.thumbnailpath
 
+
+def format_search_string(search_string):
+    special_chars = [".", "^", "$", "+", "{"]
+    formatted_string = search_string.upper()
+    for c in special_chars:
+        formatted_string = formatted_string.replace(c, "\\" + c)
+    formatted_string = formatted_string.replace("?", ".")
+    formatted_string = formatted_string.replace("*", ".*?")
+    return formatted_string
+
+
 def clear_cache():
-    temp_files = os.listdir(TEMP_FILES_LOCATION)
+    temp_files = os.listdir(TEMP_DATA_LOCATION)
+    print("Clearing {} files from:\n{}".format(len(temp_files), TEMP_DATA_LOCATION))
     fails = []
     for f in temp_files:
+        full_f = os.path.join(TEMP_DATA_LOCATION, f)
+
         try:
-            if f.endswith('.dat'):
-                data = access_bin_file(f)
-                if data.unsaved_changes:
-                    pass
-                else:
-                    os.remove(f)
+            if full_f.endswith('.dat'):
+                try:
+                    data = access_bin_file(full_f)
+                    if data is False:
+                        os.remove(full_f)
+                    elif data.unsaved_changes:
+                        pass
+                    else:
+                        os.remove(full_f)
+                except AttributeError or EOFError:
+                    os.remove(full_f)
             else:
-                os.remove(f)
-        except AccessError:
-            fails.append(f)
+                os.remove(full_f)
+        except PermissionError:
+            fails.append(full_f)
+        except FileNotFoundError:
+            pass
     return fails
           
+
+def create_cached_record(record_id=None):
+    if record_id is None:
+        record_obj = ArchiveRecord(record_id=0)
+    else:
+        record_obj = get_record_by_id(record_id)
+
+    if record_obj is None:
+        return None
+    else:
+        fd, record_object_path = temp.mkstemp(".dat", "OATEMP", TEMP_DATA_LOCATION)
+        os.close(fd)
+        save_bin_file(record_object_path, record_obj)
+        return record_object_path
+
+
+def commit_record(cached_record_path=None, record_obj=None):
+    # Commits changes or new record to db
+    if record_obj is None:
+        record_obj = access_bin_file(cached_record_path)
+    else:
+        pass
+    record_id, params = format_record_obj_to_sql(record_obj)
+    print(record_id)
+    print(params)
+    if (record_id == 0) or (record_id == "New Record") or (record_id is None):
+        bliss.run("INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,"
+                  "physical_ref, other_ref, tags, created_by, created_time)"
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  params)
+    else:
+        params.append(record_id)
+        bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?, end_date=?,"
+                  "physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=? WHERE id=?", params)
+    conn.commit()

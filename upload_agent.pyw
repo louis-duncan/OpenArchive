@@ -5,6 +5,7 @@ import database_io
 import temp
 from PIL import Image
 import textwrap
+import pickle
 
 __title__ = "OpenArchive - Upload Agent"
 __author__ = "Louis Thurman"
@@ -12,22 +13,22 @@ __author__ = "Louis Thurman"
 no_thumb_file = ".\\bin\\no_thumb.jpg"
 
 
-def join_files(files=None):
-    if files is None:
-        files = easygui.fileopenbox("Select Files To Combine",
-                                    __title__ + " - Combine to PDF",
-                                    os.path.join(os.environ["HOMEPATH"], "*.jpg"),
-                                    [".jpg", ".pdf"],
-                                    True)
+def join_files(file_paths=None):
+    if file_paths is None:
+        file_paths = easygui.fileopenbox("Select Files To Combine",
+                                         __title__ + " - Combine to PDF",
+                                         os.path.join(os.environ["HOMEPATH"], "*.jpg"),
+                                         [".jpg", ".pdf"],
+                                         True)
     else:
         pass
 
-    if files is None:
+    if file_paths is None:
         return None
     else:
-        fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP")
+        fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
         os.close(fd)
-        err = im2pdf.union(files, output_path)
+        err = im2pdf.union(file_paths, output_path)
         if err:
             easygui.msgbox('The PDF could not be created!',
                            __title__ + " - Error")
@@ -119,7 +120,8 @@ def manage_attachments(file_list):
     while True:
         display_list = []
         for t in thumb_files:
-            if t.startswith("OATEMP"):
+            name = os.path.split(t)[1]
+            if name.startswith("OATEMP"):
                 os.remove(t)
             else:
                 pass
@@ -135,7 +137,7 @@ def manage_attachments(file_list):
                                  "BMP",
                                  "PNG",  # If file is image, create thumbnail.
                                  ):
-                    fd, thumb_file = temp.mkstemp(suffix=".jpg", prefix="OATEMP", dir=os.environ["TEMP"])
+                    fd, thumb_file = temp.mkstemp(suffix=".jpg", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
                     os.close(fd)
                     im = Image.open(f)
                     im.thumbnail((500, 200), Image.ANTIALIAS)
@@ -192,7 +194,18 @@ def manage_attachments(file_list):
     # Todo: Pick up from here
 
 
-def edit_record(record):
+def edit_record(record_id=None, local_cached_record_path=None):
+    if (record_id is None) and (local_cached_record_path is None):
+        r_path = database_io.create_cached_record()
+    elif record_id is not None:
+        r_path = database_io.create_cached_record(record_id)
+    else:
+        r_path = local_cached_record_path
+    record = database_io.load_cached_record(r_path)
+    if record is None:
+        return None
+    else:
+        pass
     choices = ["Add\nInformation",
                "Edit\nDescription",
                "Select\nRecord Type",
@@ -305,7 +318,7 @@ def upload_single_file(file_path=None):
                          "BMP",
                          "PNG",  # If file is image, create thumbnail.
                          ):
-            fd, thumb_file = temp.mkstemp(suffix=".jpg", dir=os.environ["TEMP"])
+            fd, thumb_file = temp.mkstemp(suffix=".jpg", dir=database_io.TEMP_DATA_LOCATION)
             os.close(fd)
             im = Image.open(file_path)
             im.thumbnail((500, 200), Image.ANTIALIAS)
