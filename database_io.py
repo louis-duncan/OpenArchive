@@ -3,6 +3,8 @@ import sqlite3
 import sql
 import datetime
 import easygui
+import pickle
+import temp
 
 __title__ = "OpenArchive"
 
@@ -11,14 +13,26 @@ valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&(
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"
 ARCHIVE_LOCATION = os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
+TEMP_DATA_LOCATION = os.path.join(os.environ["TEMP"], "OpenArchive")
+
 if os.path.exists(DATABASE_LOCATION):
     conn = sqlite3.connect(DATABASE_LOCATION)
     bliss = sql.SQL(conn)
     # A test to see if tables 'resources', 'resource_types', and 'local_authorities' should go here.
     # But I haven't worked out the best way to check yet.
 else:
-    easygui.msgbox("The database could not be located.\nThe program will now exit.")
+    easygui.msgbox("The database could not be located.\n{}\n\nThe program will now exit."
+                   .format(DATABASE_LOCATION))
     exit()
+if os.path.exists(ARCHIVE_LOCATION):
+    pass
+else:
+    easygui.msgbox("The data repository could not be located.\n{}\n\nThe program will now exit."
+                   .format(ARCHIVE_LOCATION))
+if os.path.exists(TEMP_DATA_LOCATION):
+    pass
+else:
+    os.mkdir(TEMP_DATA_LOCATION)
 
 
 class ArchiveRecord:
@@ -135,6 +149,29 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
                     pass
                 else:
                     self.tags.append(p)
+
+
+def access_bin_file(filename):
+    """Accesses a '.dat' binary file."""
+    try: #Tries to access the file normally
+        #If unsuccessful due to non-existent file resort to 'except' statement
+        file = open(filename, "br")
+        data = pickle.load(file)
+        file.close()
+    except FileNotFoundError:
+        #Creates empty file and returns 'None'
+        data = None
+        file = open(filename, "bw")
+        pickle.dump(data, file)
+        file.close()
+    return data
+
+
+def save_bin_file(filename,data):
+    """Saves to a '.dat' binary file"""
+    file = open(filename, "bw") #If file doesn't exists it is created with the file-name given
+    pickle.dump(data, file)
+    file.close()
 
 
 def check_text_is_valid(text):
@@ -284,3 +321,26 @@ def clear_cache():
             fails.append(f)
     return fails
           
+
+def create_cached_record(record_id=None):
+    if record_id is None:
+        # New empty obj
+        # Add to new file
+        pass
+    else:
+        record_obj = get_record_by_id(record_id)
+        if record_obj is None:
+            return None
+        else:
+            record_object_path = temp.mkstemp(".dat", "OATEMP", TEMP_DATA_LOCATION)
+    return record_object_path
+
+
+def commit_record():
+    # Commits changes or new record to db
+    pass
+
+
+def clear_up():
+    # Will clear the temp folder
+    pass
