@@ -47,7 +47,7 @@ class ArchiveRecord:
     start_date = datetime.datetime
     end_date = datetime.datetime
     tags = []
-    physical_index = ""
+    physical_ref = ""
     other_ref = ""
     linked_files = []
     thumb_files = []
@@ -57,7 +57,7 @@ class ArchiveRecord:
 
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type="", local_auth="",
-                 start_date=None, end_date=None, physical_index="", other_ref="", tags=[], linked_files=[],
+                 start_date=None, end_date=None, physical_ref="", other_ref="", tags=[], linked_files=[],
                  thumb_files=[], created_by="", created_time=None):
         self.record_id = record_id
         self.title = title
@@ -66,7 +66,7 @@ class ArchiveRecord:
         self.local_auth = local_auth
         self.start_date = start_date
         self.end_date = end_date
-        self.physical_index = physical_index
+        self.physical_ref = physical_ref
         self.other_ref = other_ref
         self.tags = tags
         self.linked_files = linked_files
@@ -316,7 +316,7 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
                        local_auth_id,
                        start_date_stamp,
                        end_date_stamp,
-                       record_obj.physical_index,
+                       record_obj.physical_ref,
                        record_obj.other_ref,
                        tags_string,
                        record_obj.created_by,
@@ -429,6 +429,7 @@ def commit_record(cached_record_path=None, record_obj=None):
 
 
 def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
+    # Only retrieve results in the resource and auth brackets.
     if (resource_type is None) and (local_auth is None):
         base_list = bliss.all("SELECT * FROM resources", [])
     elif (resource_type is not None) and (local_auth is None):
@@ -438,51 +439,69 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
     else:
         base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
                               (local_auth, resource_type))
-    scored_results = score_results(base_list, text, start_date, end_date)
-    return scored_results
+    if (len(str(text)) != 0) and (text is not None):
+        scored_results = score_results(base_list, text)
+        return scored_results
+    else:
+        return base_list
 
 
-def score_results(results, text, start_date, end_date):
+def score_results(results, text):
     scores = []
     r: ArchiveRecord
     for r in results:
+        print()
         # Gen score
-        title_similarity = textdistance.levenshtein.normalized_similarity(text, r.title)
+        title_similarity = textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
         key_words = text.upper().split(" ")
-        if text not in key_words:
+        # print(text, key_words)
+        if text.upper() not in key_words:
             key_words.append(text.upper())
-        key_word_hits = 0
-        physical_index_hit = False
-        other_ref_hit = False
+        key_word_hits = 1
+        physical_ref_hit = 1
+        other_ref_hit = 1
         for k in key_words:
             formatted = format_search_string(k)
-            if re.search(formatted, r.title) is not None:
+            if re.search(formatted, r.title.upper()) is not None:
                 key_word_hits += 1
             else:
                 pass
-            if re.search(formatted, r.description) is not None:
+            if re.search(formatted, r.description.upper()) is not None:
                 key_word_hits += 1
             else:
                 pass
-            for t in r.tags:
-                if re.search(formatted, t) is not None:
-                    key_word_hits += 1
+            if r.tags is not None:
+                for t in r.tags:
+                    if re.search(formatted, t.upper()) is not None:
+                        key_word_hits += 1
+                    else:
+                        pass
+            else:
+                pass
+            if r.physical_ref is not None:
+                if re.search(formatted, r.physical_ref) is not None:
+                    physical_ref_hit = 2
                 else:
                     pass
-            if re.search(formatted, r.physical_index) is not None:
-                physical_index_hit = True
             else:
                 pass
-            if re.search(formatted, r.other_ref) is not None:
-                other_ref_hit = True
+            if r.other_ref is not None:
+                if re.search(formatted, r.other_ref) is not None:
+                    other_ref_hit = 2
+                else:
+                    pass
             else:
                 pass
-            # Todo Add Date Checks
-
-        score = float(title_similarity * key_word_hits * int(physical_index_hit) * int(other_ref_hit))
+        print(key_words)
+        print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
+        score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
+        print(r.id, score)
         if score == 0.0:
             pass
         else:
             scores.append((r, score))
     scores.sort(key=lambda s: s[1])
-    return scores
+    final_results = []
+    for sr in scores:
+        final_results.append(sr[0])
+    return final_results
