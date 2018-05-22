@@ -428,8 +428,8 @@ def commit_record(cached_record_path=None, record_obj=None):
     conn.commit()
 
 
-def search_archive(text="", resource_types=(), local_auths=(), search_modes=(), start_date_lower=None,
-                   start_date_upper=None, end_date_lower=None, end_date_upper=None):
+def search_archive(text="", resource_types=(), local_auths=(), start_date_lower=None, start_date_upper=None,
+                   end_date_lower=None, end_date_upper=None, search_modes=()):
     # Only retrieve results in the resource and auth brackets.
     filter_strings = []
     if len(resource_types) > 0:
@@ -450,16 +450,32 @@ def search_archive(text="", resource_types=(), local_auths=(), search_modes=(), 
         filter_strings.append(auth_string)
     else:
         pass
-    filters = ""
-    for i in range(len(filter_strings) - 1):
-        filters += filter_strings[i] + " {} ".format(search_modes[i])
-    filters = filters.strip(" ")
-    if filters == "":
+    if start_date_lower is not None and start_date_upper is not None:
+        start_date_string = "(start_date BETWEEN {} AND {})".format(start_date_lower, start_date_upper)
+        filter_strings.append(start_date_string)
+    else:
+        pass
+    if end_date_lower is not None and end_date_upper is not None:
+        end_date_string = "(end_date BETWEEN {} AND {})".format(end_date_lower, end_date_upper)
+        filter_strings.append(end_date_string)
+    else:
+        pass
+
+    combined_filters = ""
+    if len(filter_strings) == 0:
+        pass
+    elif len(filter_strings) >= 1:
+        combined_filters += filter_strings.pop(0)
+        for i in range(len(filter_strings)):
+            combined_filters += " {} {}".format(search_modes[i], filter_strings[i])
+
+    if combined_filters == "":
         query = "SELECT * FROM resources"
     else:
-        query = "SELECT * FROM resources WHERE {}".format(filters)
+        query = "SELECT * FROM resources WHERE {}".format(combined_filters)
     print(query)
     return None
+
     base_results = bliss.all(query, [])
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(base_results, text)
