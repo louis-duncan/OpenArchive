@@ -428,29 +428,50 @@ def commit_record(cached_record_path=None, record_obj=None):
     conn.commit()
 
 
-def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
+def search_archive(text="", resource_types=(), local_auths=(), search_modes=(), start_date_lower=None,
+                   start_date_upper=None, end_date_lower=None, end_date_upper=None):
     # Only retrieve results in the resource and auth brackets.
-    if (resource_type is None) and (local_auth is None):
-        base_list = bliss.all("SELECT * FROM resources", [])
-    elif (resource_type is not None) and (local_auth is None):
-        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type,])
-    elif (resource_type is None) and (local_auth is not None):
-        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth,])
+    filter_strings = []
+    if len(resource_types) > 0:
+        resource_string = ""
+        for rt in resource_types:
+            resource_string += "record_type={} OR ".format(rt)
+        resource_string = resource_string.strip(" OR ")
+        resource_string = "({})".format(resource_string)
+        filter_strings.append(resource_string)
     else:
-        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
-                              (local_auth, resource_type))
+        pass
+    if len(local_auths) > 0:
+        auth_string = ""
+        for la in local_auths:
+            auth_string += "local_auth={} OR ".format(la)
+        auth_string = auth_string.strip(" OR ")
+        auth_string = "({})".format(auth_string)
+        filter_strings.append(auth_string)
+    else:
+        pass
+    filters = ""
+    for i in range(len(filter_strings) - 1):
+        filters += filter_strings[i] + " {} ".format(search_modes[i])
+    filters = filters.strip(" ")
+    if filters == "":
+        query = "SELECT * FROM resources"
+    else:
+        query = "SELECT * FROM resources WHERE {}".format(filters)
+    print(query)
+    return None
+    base_results = bliss.all(query, [])
     if (len(str(text)) != 0) and (text is not None):
-        scored_results = score_results(base_list, text)
+        scored_results = score_results(base_results, text)
         return scored_results
     else:
-        return base_list
+        return base_results
 
 
 def score_results(results, text):
     scores = []
     r: ArchiveRecord
     for r in results:
-        print()
         # Gen score
         title_similarity = textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
         key_words = text.upper().split(" ")
@@ -492,15 +513,19 @@ def score_results(results, text):
                     pass
             else:
                 pass
-        print(key_words)
-        print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
-        score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
-        print(r.id, score)
+        # print(r.title)
+        # print(r.description)
+        # print(key_words)
+        # print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
+        score = float((title_similarity + 1) * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
+        # print("Final score", score)
         if score == 0.0:
             pass
         else:
             scores.append((r, score))
-    scores.sort(key=lambda s: s[1])
+        # print()
+    # print(scores)
+    scores.sort(key=lambda s: s[1], reverse=True)
     final_results = []
     for sr in scores:
         final_results.append(sr[0])
