@@ -74,31 +74,6 @@ class ArchiveRecord:
         self.created_by = created_by
         self.created_time = created_time
 
-    def __len__(self):
-        return 0
-
-    def __str__(self, *args):
-        title_len = 20
-        desc_len = 40
-
-        if len(args) == 2:
-            title_len = args[0]
-            desc_len = args[1]
-
-        id_string = str(self.record_id).zfill(4)
-
-        if len(self.title) > title_len:
-            title_string = self.title[:title_len - 3] + "..."
-        else:
-            title_string = self.title
-
-        if len(self.description) > desc_len:
-            desc_string = self.description[:desc_len - 3] + "..."
-        else:
-            desc_string = self.description
-
-        return "{} - {} - {}".format(id_string, title_string.ljust(title_len), desc_string.ljust(desc_len))
-
     def launch_file(self, file_index=0):
         if self.linked_files is None:
             pass
@@ -301,7 +276,7 @@ def format_sql_to_record_obj(db_record_object):
                                local_auth=auth_text,
                                start_date=start_date,
                                end_date=end_date,
-                               physical_ref=db_record_object.physical_ref,
+                               physical_index=db_record_object.physical_ref,
                                other_ref=db_record_object.other_ref,
                                tags=tags,
                                linked_files=linked_files,
@@ -453,71 +428,29 @@ def commit_record(cached_record_path=None, record_obj=None):
     conn.commit()
 
 
-def search_archive(text="", resource_types=(), local_auths=(), start_date_lower=None, start_date_upper=None,
-                   end_date_lower=None, end_date_upper=None, search_modes=()):
+def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
     # Only retrieve results in the resource and auth brackets.
-    filter_strings = []
-    if len(resource_types) > 0:
-        resource_string = ""
-        for rt in resource_types:
-            resource_string += "record_type={} OR ".format(rt)
-        resource_string = resource_string.strip(" OR ")
-        resource_string = "({})".format(resource_string)
-        filter_strings.append(resource_string)
+    if (resource_type is None) and (local_auth is None):
+        base_list = bliss.all("SELECT * FROM resources", [])
+    elif (resource_type is not None) and (local_auth is None):
+        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type,])
+    elif (resource_type is None) and (local_auth is not None):
+        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth,])
     else:
-        pass
-    if len(local_auths) > 0:
-        auth_string = ""
-        for la in local_auths:
-            auth_string += "local_auth={} OR ".format(la)
-        auth_string = auth_string.strip(" OR ")
-        auth_string = "({})".format(auth_string)
-        filter_strings.append(auth_string)
-    else:
-        pass
-    if start_date_lower is not None and start_date_upper is not None:
-        start_date_string = "(start_date BETWEEN {} AND {})".format(start_date_lower, start_date_upper)
-        filter_strings.append(start_date_string)
-    else:
-        pass
-    if end_date_lower is not None and end_date_upper is not None:
-        end_date_string = "(end_date BETWEEN {} AND {})".format(end_date_lower, end_date_upper)
-        filter_strings.append(end_date_string)
-    else:
-        pass
-
-    combined_filters = ""
-    if len(filter_strings) == 0:
-        pass
-    elif len(filter_strings) >= 1:
-        combined_filters += filter_strings.pop(0)
-        for i in range(len(filter_strings)):
-            combined_filters += " {} {}".format(search_modes[i], filter_strings[i])
-
-    if combined_filters == "":
-        query = "SELECT * FROM resources"
-    else:
-        query = "SELECT * FROM resources WHERE {}".format(combined_filters)
-    #print(query)
-
-    base_results = bliss.all(query, [])
+        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
+                              (local_auth, resource_type))
     if (len(str(text)) != 0) and (text is not None):
-        scored_results = score_results(base_results, text)
+        scored_results = score_results(base_list, text)
+        return scored_results
     else:
-        scored_results = base_results
-    data_to_cache = []
-    for sr in scored_results:
-        data_to_cache.append(format_sql_to_record_obj(sr)) # Error
-    fd, record_object_path = temp.mkstemp(".dat", "OATEMP", TEMP_DATA_LOCATION)
-    os.close(fd)
-    save_bin_file(record_object_path, data_to_cache)
-    return record_object_path
+        return base_list
 
 
 def score_results(results, text):
     scores = []
     r: ArchiveRecord
     for r in results:
+        print()
         # Gen score
         title_similarity = textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
         key_words = text.upper().split(" ")
@@ -559,19 +492,15 @@ def score_results(results, text):
                     pass
             else:
                 pass
-        # print(r.title)
-        # print(r.description)
-        # print(key_words)
-        # print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
-        score = float((title_similarity + 1) * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
-        # print("Final score", score)
+        print(key_words)
+        print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
+        score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
+        print(r.id, score)
         if score == 0.0:
             pass
         else:
             scores.append((r, score))
-        # print()
-    # print(scores)
-    scores.sort(key=lambda s: s[1], reverse=True)
+    scores.sort(key=lambda s: s[1])
     final_results = []
     for sr in scores:
         final_results.append(sr[0])
