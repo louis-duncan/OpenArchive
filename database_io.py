@@ -74,6 +74,31 @@ class ArchiveRecord:
         self.created_by = created_by
         self.created_time = created_time
 
+    def __len__(self):
+        return 0
+
+    def __str__(self, *args):
+        title_len = 20
+        desc_len = 40
+
+        if len(args) == 2:
+            title_len = args[0]
+            desc_len = args[1]
+
+        id_string = str(self.record_id).zfill(4)
+
+        if len(self.title) > title_len:
+            title_string = self.title[:title_len - 3] + "..."
+        else:
+            title_string = self.title
+
+        if len(self.description) > desc_len:
+            desc_string = self.description[:desc_len - 3] + "..."
+        else:
+            desc_string = self.description
+
+        return "{} - {} - {}".format(id_string, title_string.ljust(title_len), desc_string.ljust(desc_len))
+
     def launch_file(self, file_index=0):
         if self.linked_files is None:
             pass
