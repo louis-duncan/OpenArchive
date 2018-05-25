@@ -58,7 +58,7 @@ class ArchiveRecord:
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type="", local_auth="",
                  start_date=None, end_date=None, physical_ref="", other_ref="", tags=[], linked_files=[],
-                 thumb_files=[], created_by="", created_time=None):
+                 thumb_files=[], created_by="", created_time=None, last_changed_by=None, last_changed_time=None):
         self.record_id = record_id
         self.title = title
         self.description = description
@@ -73,6 +73,8 @@ class ArchiveRecord:
         self.thumb_files = thumb_files
         self.created_by = created_by
         self.created_time = created_time
+        self.last_changed_by = last_changed_by
+        self.last_changed_time = last_changed_time
 
     def __len__(self):
         return 0
@@ -155,6 +157,18 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 Date is invalid. The format DD/MM/YYYY must be followed."""
                 easygui.msgbox(error_msg, __title__ + " - Date Error")
+
+    def created_time_string(self):
+        if self.created_time is None:
+            return None
+        else:
+            return "{:%d/%m/%Y %H:%Mhrs}".format(self.created_time)
+
+    def last_changed_time_string(self):
+        if self.last_changed_time is None:
+            return None
+        else:
+            return "{:%d/%m/%Y %H:%Mhrs}".format(self.last_changed_time)
 
     def string_tags(self, tags_to_add=None):
         prompt = 'Enter tags comma separated. (eg. tag1, tag2,...)'
@@ -278,6 +292,10 @@ def format_sql_to_record_obj(db_record_object):
         created_time = None
     else:
         created_time = datetime.datetime.fromtimestamp(int(db_record_object.created_time / 1000))
+    if db_record_object.last_changed_time is None:
+        last_changed_time = None
+    else:
+        last_changed_time = datetime.datetime.fromtimestamp(int(db_record_object.last_changed_time / 1000))
 
     # Create tag and item lists
     if db_record_object.tags is not None:
@@ -301,13 +319,15 @@ def format_sql_to_record_obj(db_record_object):
                                local_auth=auth_text,
                                start_date=start_date,
                                end_date=end_date,
-                               physical_index=db_record_object.physical_ref,
+                               physical_ref=db_record_object.physical_ref,
                                other_ref=db_record_object.other_ref,
                                tags=tags,
                                linked_files=linked_files,
                                thumb_files=thumb_files,
                                created_by=db_record_object.created_by,
                                created_time=created_time,
+                               last_changed_by=db_record_object.last_changed_by,
+                               last_changed_time=last_changed_time,
                                )
     return record_obj
 
@@ -366,6 +386,21 @@ def return_local_authorities():
     return local_authorities
 
 
+def float_none_drop_other(t):
+    if t == "None":
+        return "AAAAAAAAAA"
+    elif t.endswith("Other"):
+        parts = t.split(" ")
+        new = ""
+        parts.pop(len(parts) - 1)
+        for p in parts:
+            new += p + " "
+        new += "zzzzzzzzzz"
+        return new
+    else:
+        return t
+
+
 def get_thumbnail(file_link_id=None, file_path=None):
     if file_link_id is not None:
         thumbnail_record = bliss.one("SELECT * FROM file_links WHERE id=?", (file_link_id,))
@@ -415,7 +450,7 @@ def clear_cache():
         except FileNotFoundError:
             pass
     return fails
-          
+
 
 def create_cached_record(record_id=None):
     if record_id is None:
@@ -458,9 +493,9 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
     if (resource_type is None) and (local_auth is None):
         base_list = bliss.all("SELECT * FROM resources", [])
     elif (resource_type is not None) and (local_auth is None):
-        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type,])
+        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type, ])
     elif (resource_type is None) and (local_auth is not None):
-        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth,])
+        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth, ])
     else:
         base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
                               (local_auth, resource_type))
