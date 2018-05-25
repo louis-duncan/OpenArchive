@@ -10,7 +10,6 @@ class RecordEditor(wx.Frame):
         wx.Frame.__init__(self, parent, title=title, size=(1000, 500))
 
         self.record = record_to_edit
-        self.changes = False
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         grid = wx.GridBagSizer(vgap=10, hgap=10)
@@ -33,7 +32,8 @@ class RecordEditor(wx.Frame):
         # Add Adjustable Description
         desc_lbl = wx.StaticText(bg_panel, label="Description*:")
         grid.Add(desc_lbl, (3, 1), flag=wx.ALIGN_TOP | wx.ALIGN_RIGHT)
-        self.desc_box = wx.TextCtrl(bg_panel, value=str(self.record.description), size=(350, 140), style=wx.TE_MULTILINE)
+        self.desc_box = wx.TextCtrl(bg_panel, value=str(self.record.description), size=(350, 140),
+                                    style=wx.TE_MULTILINE)
         grid.Add(self.desc_box, pos=(3, 2), span=(2, 4))
 
         # Add Type Selection
@@ -43,7 +43,7 @@ class RecordEditor(wx.Frame):
         types.sort(key=database_io.float_none_drop_other)
         types.append("Add New...")
         self.type_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=types, value=self.record.record_type,
-                                style=wx.CB_DROPDOWN | wx.CB_READONLY)
+                                     style=wx.CB_DROPDOWN | wx.CB_READONLY)
         grid.Add(self.type_comb, pos=(5, 2), span=(1, 4))
 
         # Add Local Authority Selection
@@ -53,16 +53,16 @@ class RecordEditor(wx.Frame):
         local_authorities.sort(key=database_io.float_none_drop_other)
         local_authorities.append("Add New...")
         self.local_authorities_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=local_authorities,
-                                             value=self.record.local_auth, style=wx.CB_DROPDOWN | wx.CB_READONLY,
-                                             name="Click to choose Local Authority")
+                                                  value=self.record.local_auth, style=wx.CB_DROPDOWN | wx.CB_READONLY,
+                                                  name="Click to choose Local Authority")
         grid.Add(self.local_authorities_comb, pos=(6, 2), span=(1, 4))
 
         # Add date selectors
         start_date_lbl = wx.StaticText(bg_panel, label="Start Date:")
         grid.Add(start_date_lbl, (7, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.start_date_picker = wx.adv.DatePickerCtrl(bg_panel, size=(120, -1), style=wx.adv.DP_DROPDOWN
-                                                                                  | wx.adv.DP_SHOWCENTURY
-                                                                                  | wx.adv.DP_ALLOWNONE)
+                                                                                       | wx.adv.DP_SHOWCENTURY
+                                                                                       | wx.adv.DP_ALLOWNONE)
         if self.record.start_date is not None:
             start_dt = wx.DateTime(self.record.start_date.day,
                                    self.record.start_date.month - 1,  # Because for some reason the months start at 0.
@@ -75,8 +75,8 @@ class RecordEditor(wx.Frame):
         end_date_lbl = wx.StaticText(bg_panel, label="End Date:")
         grid.Add(end_date_lbl, (7, 4), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.end_date_picker = wx.adv.DatePickerCtrl(bg_panel, size=(120, -1), style=wx.adv.DP_DROPDOWN
-                                                                                | wx.adv.DP_SHOWCENTURY
-                                                                                | wx.adv.DP_ALLOWNONE)
+                                                                                     | wx.adv.DP_SHOWCENTURY
+                                                                                     | wx.adv.DP_ALLOWNONE)
         if self.record.end_date is not None:
             end_dt = wx.DateTime(self.record.end_date.day,
                                  self.record.end_date.month - 1,  # Because for some reason the months start at 0.
@@ -114,8 +114,8 @@ class RecordEditor(wx.Frame):
         file_buttons_sizer.Add(self.upload_single_button)
         self.upload_multiple_button = wx.Button(bg_panel, size=(100, -1), label="Merge to PDF\nand Upload")
         file_buttons_sizer.Add(self.upload_multiple_button)
-        file_buttons_sizer.AddSpacer(10)
-        self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
+        file_buttons_sizer.Add((10, -1), wx.EXPAND)
+        self.remove_file_button = wx.Button(bg_panel, size=(70, -1), label="Unlink\nFile")
         file_buttons_sizer.Add(self.remove_file_button)
 
         grid.Add(file_buttons_sizer, (4, 7), flag=wx.EXPAND)
@@ -150,9 +150,56 @@ class RecordEditor(wx.Frame):
 
         self.SetSizerAndFit(sizer)
 
+        self.create_binds()
+
         self.Show(True)
 
+        self.unsaved_changes = False
 
-app = wx.App(False)
-frame = RecordEditor(None, "OpenArchive - Edit Record", database_io.get_record_by_id(5))
-app.MainLoop()
+    def create_binds(self):
+        # All Entry Fields > Update Change Status
+        self.Bind(wx.EVT_TEXT, self.set_changed, self.title_box)
+        self.Bind(wx.EVT_TEXT, self.set_changed, self.desc_box)
+        self.Bind(wx.EVT_COMBOBOX, self.set_changed, self.type_comb)
+        self.Bind(wx.EVT_COMBOBOX, self.set_changed, self.local_authorities_comb)
+        self.Bind(wx.adv.EVT_DATE_CHANGED, self.set_changed, self.start_date_picker)
+        self.Bind(wx.adv.EVT_DATE_CHANGED, self.set_changed, self.end_date_picker)
+        self.Bind(wx.EVT_TEXT, self.set_changed, self.physical_ref_box)
+        self.Bind(wx.EVT_TEXT, self.set_changed, self.other_ref_box)
+
+        # File Link Double-click
+        self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_clicked, self.file_list_box)
+
+        # Close Button > Close Frame
+        self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
+
+    def close_button_press(self, event):
+        self.Close()
+
+    def set_changed(self, event):
+        self.unsaved_changes = True
+        self.save_button.Enable()
+
+    def file_link_clicked(self, event):
+        suc = self.record.launch_file(self.record.linked_files.index(event.GetString()))
+        if suc is True:
+            return None
+        elif suc == "Index Error":
+            msg = "File {} does not appear to be linked to this record!".format(event.GetString())
+        elif suc == "Path Error":
+            msg = "File {} does not appear to exist!".format(event.GetString())
+        else:
+            msg = "File {} could not be opened for an unknown reason, which is worrying...".format(event.GetString())
+        dlg = wx.MessageDialog(self, msg, "File Error", wx.OK)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+
+def main(record_obj):
+    app = wx.App(False)
+    frame = RecordEditor(None, "OpenArchive - View/Edit Record", record_obj)
+    app.MainLoop()
+
+
+if __name__ == "__main__":
+    main(database_io.get_record_by_id(6))

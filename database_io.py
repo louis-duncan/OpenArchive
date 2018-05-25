@@ -109,16 +109,13 @@ class ArchiveRecord:
                 if os.path.exists(self.linked_files[file_index]):
                     fail = os.startfile(self.linked_files[file_index])
                     if fail:
-                        easygui.msgbox("File {} could not be opened. Unknown error.".
-                                       format(self.linked_files[file_index]))
+                        return "Unknown Error"
                     else:
-                        pass
+                        return True
                 else:
-                    easygui.msgbox("File {} could not be opened. Path does not exist."
-                                   .format(self.linked_files[file_index]))
+                    return "Path Error"
             except IndexError:
-                easygui.msgbox("No file in record {} ({}) with index {}.".format(self.record_id,
-                                                                                 self.title, file_index))
+                return "Index Error"
 
     def start_date_string(self, date_to_add=None):
         if (date_to_add is None) or (date_to_add == ""):
