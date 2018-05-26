@@ -53,7 +53,8 @@ class ArchiveRecord:
     thumb_files = []
     created_by = ""
     created_time = datetime.datetime
-    unsaved_changes = False
+    last_changed_by = ""
+    last_changed_time = datetime.datetime
 
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type="", local_auth="",
@@ -231,7 +232,7 @@ def check_text_is_valid(text):
                 valid = False
                 bad_chars.append(c)
         if valid:
-            return valid
+            return True
         else:
             return bad_chars
 
@@ -296,7 +297,7 @@ def format_sql_to_record_obj(db_record_object):
 
     # Create tag and item lists
     if db_record_object.tags is not None:
-        tags = db_record_object.tags.split(",")
+        tags = db_record_object.tags.split("|")
         while tags.count("") > 0:
             tags.remove("")
     else:
@@ -465,6 +466,7 @@ def create_cached_record(record_id=None):
 
 
 def commit_record(cached_record_path=None, record_obj=None):
+    # Todo: Add creator and changer details to commited records.
     # Commits changes or new record to db
     if record_obj is None:
         record_obj = access_bin_file(cached_record_path)
@@ -562,3 +564,15 @@ def score_results(results, text):
     for sr in scores:
         final_results.append(sr[0])
     return final_results
+
+
+def check_record(record_obj: ArchiveRecord):
+    if "" in (record_obj.title.strip(), record_obj.title.strip()):
+        return "Missing Field"
+    else:
+        title_valid = check_text_is_valid(record_obj.title)
+        description_valid = check_text_is_valid(record_obj.description)
+        if (title_valid is True) and (description_valid is True):
+            return True
+        else:
+            return "Bad Chars"
