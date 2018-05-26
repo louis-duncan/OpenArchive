@@ -3,6 +3,7 @@ import wx
 import wx.adv
 import os
 import database_io
+import textdistance
 
 
 class RecordEditor(wx.Frame):
@@ -21,8 +22,8 @@ class RecordEditor(wx.Frame):
         # Add Record ID
         id_lbl = wx.StaticText(bg_panel, label="Record ID:")
         left_column.Add(id_lbl, pos=(1, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-        record_id = wx.StaticText(bg_panel, label=str(self.record.record_id))
-        left_column.Add(record_id, pos=(1, 2))
+        self.record_id_text = wx.StaticText(bg_panel, label=str(self.record.record_id), size=(100, -1))
+        left_column.Add(self.record_id_text, pos=(1, 2))
 
         # Add Adjustable Title
         title_lbl = wx.StaticText(bg_panel, label="Title*:")
@@ -43,7 +44,7 @@ class RecordEditor(wx.Frame):
         types = database_io.return_types()
         types.sort(key=database_io.float_none_drop_other)
         types.append("Add New...")
-        self.type_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=types, value=self.record.record_type,
+        self.type_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=types, value=str(self.record.record_type),
                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
         left_column.Add(self.type_comb, pos=(4, 2), span=(1, 4))
 
@@ -54,7 +55,8 @@ class RecordEditor(wx.Frame):
         local_authorities.sort(key=database_io.float_none_drop_other)
         local_authorities.append("Add New...")
         self.local_authorities_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=local_authorities,
-                                                  value=self.record.local_auth, style=wx.CB_DROPDOWN | wx.CB_READONLY,
+                                                  value=str(self.record.local_auth),
+                                                  style=wx.CB_DROPDOWN | wx.CB_READONLY,
                                                   name="Click to choose Local Authority")
         left_column.Add(self.local_authorities_comb, pos=(5, 2), span=(1, 4))
 
@@ -151,14 +153,14 @@ class RecordEditor(wx.Frame):
         right_column.Add(main_buttons_sizer, (5, 1), flag=wx.EXPAND)
 
         # Add created and changed info
-        created_text = wx.StaticText(bg_panel, label="Created by:\n{} - {}"
+        self.created_text = wx.StaticText(bg_panel, label="Created by:\n{} - {}"
                                      .format(str(self.record.created_by), str(self.record.created_time_string())))
-        right_column.Add(created_text, (6, 1))
+        right_column.Add(self.created_text, (6, 1))
 
-        changed_text = wx.StaticText(bg_panel, label="Last Changed:\n{} - {}"
+        self.changed_text = wx.StaticText(bg_panel, label="Last Changed:\n{} - {}"
                                      .format(str(self.record.last_changed_by),
                                              str(self.record.last_changed_time_string())))
-        right_column.Add(changed_text, (7, 1))
+        right_column.Add(self.changed_text, (7, 1))
 
         # Add a spacer to the sizer
         right_column.Add((20, 10), pos=(8, 2))
@@ -181,10 +183,10 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_COMBOBOX, self.update_type, self.type_comb)
         self.Bind(wx.EVT_COMBOBOX, self.update_local_auth, self.local_authorities_comb)
         self.Bind(wx.adv.EVT_DATE_CHANGED, self.update_start_date, self.start_date_picker)
-        self.Bind(wx.adv.EVT_DATE_CHANGED, self.set_changed, self.end_date_picker)
-        self.Bind(wx.EVT_TEXT, self.set_changed, self.physical_ref_box)
-        self.Bind(wx.EVT_TEXT, self.set_changed, self.other_ref_box)
-        self.Bind(wx.EVT_TEXT, self.set_changed, self.tags_box)
+        self.Bind(wx.adv.EVT_DATE_CHANGED, self.update_end_date, self.end_date_picker)
+        self.Bind(wx.EVT_TEXT, self.update_physical_ref, self.physical_ref_box)
+        self.Bind(wx.EVT_TEXT, self.update_other_ref, self.other_ref_box)
+        self.Bind(wx.EVT_TEXT, self.update_tags, self.tags_box)
 
         # File Link Double-click
         self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_clicked, self.file_list_box)
@@ -208,6 +210,28 @@ class RecordEditor(wx.Frame):
         self.set_changed()
 
     def update_start_date(self, event):
+        self.set_changed()
+
+    def update_end_date(self, event):
+        self.set_changed()
+
+    def update_physical_ref(self, event):
+        self.set_changed()
+
+    def update_other_ref(self, event):
+        self.set_changed()
+
+    def update_tags(self, event):
+        if textdistance.levenshtein(self.tags_box.GetValue(), self.record.tags_prompt) == 1:
+            if len(self.tags_box.GetValue()) < len(self.record.tags_prompt):
+                self.tags_box.ChangeValue("")
+            else:
+                if self.tags_box.GetValue().startswith(self.record.tags_prompt):
+                    self.tags_box.ChangeValue(self.tags_box.GetValue()[len(self.record.tags_prompt):])
+                else:
+                    pass
+        else:
+            pass
         self.set_changed()
 
     def close_button_press(self, event):
@@ -237,10 +261,10 @@ class RecordEditor(wx.Frame):
         if self.desc_box.GetValue().strip() != self.record.description:
             self.unsaved_changes = True
             print("Description Changed")
-        if self.type_comb.GetValue() != self.record.record_type:
+        if self.type_comb.GetValue() != str(self.record.record_type):
             self.unsaved_changes = True
             print("Type Changed")
-        if self.local_authorities_comb.GetValue() != self.record.local_auth:
+        if self.local_authorities_comb.GetValue() != str(self.record.local_auth):
             self.unsaved_changes = True
             print("Auth Changed")
 
@@ -282,10 +306,10 @@ class RecordEditor(wx.Frame):
             print("Other Ref Changed")
 
         # Tags
-        check_tags = self.tags_box.GetValue().split(",")
+        check_tags = self.record.format_string_to_tags(self.tags_box.GetValue().strip())
         if len(check_tags) != len(self.record.tags):
             self.unsaved_changes = True
-            print("Tags Changed - Len,", len(check_tags), len(self.record.tags))
+            print("Tags Changed - Len\n",check_tags,self.record.tags,"\n",len(check_tags),len(self.record.tags))
         else:
             for t in check_tags:
                 if t.upper().strip() not in self.record.tags:
@@ -352,11 +376,6 @@ class RecordEditor(wx.Frame):
                                              self.end_date_picker.GetValue().month + 1,
                                              self.end_date_picker.GetValue().day)
 
-        new_tags = []
-        parts = self.tags_box.GetValue().split(",")
-        for p in parts:
-            new_tags.append(p.strip().upper())
-
         new_linked_files = []
         for i in range(self.file_list_box.GetCount()):
             new_linked_files.append(self.file_list_box.GetString(i))
@@ -370,27 +389,24 @@ class RecordEditor(wx.Frame):
                                                    end_date=new_end_date,
                                                    physical_ref=self.physical_ref_box.GetValue().strip(),
                                                    other_ref=self.other_ref_box.GetValue().strip(),
-                                                   tags=new_tags,
                                                    linked_files=new_linked_files,
                                                    created_by=self.record.created_by,
                                                    created_time=self.record.created_time
                                                    )
+        new_record_obj.string_tags(self.tags_box.GetValue())
 
         valid = database_io.check_record(new_record_obj)
         if valid is True:
             suc = database_io.commit_record(record_obj=new_record_obj)
-            if suc is False:
-                dlg = wx.MessageDialog(self, "Record could not be added to the database!", style=wx.ICON_ERROR)
-                dlg.ShowModal()
-                dlg.Destroy()
-            elif type(suc) == database_io.ArchiveRecord:
+            if type(suc) == database_io.ArchiveRecord:
                 self.record = suc
-                self.set_changed()
+                self.refresh_all()
+                return None
             else:
-                dlg = wx.MessageDialog(self, "Don't know if the record was added or not!\nConcerning...",
-                                       style=wx.ICON_ERROR)
-                dlg.ShowModal()
-                dlg.Destroy()
+                error_msg = "Record not added due to: {}!\nConcerning...".format(suc)
+            dlg = wx.MessageDialog(self, error_msg, style=wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
         elif valid == "Bad Chars":
             dlg = wx.MessageDialog(self, "Record contains invalid characters!\nAllowed Characters:\n{}"
                                    .format(database_io.valid_chars),
@@ -403,6 +419,19 @@ class RecordEditor(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
 
+    def refresh_all(self):
+        self.record_id_text.Label = str(self.record.record_id)
+        self.title_box.ChangeValue(self.record.title)
+        self.desc_box.ChangeValue(self.record.description)
+        self.physical_ref_box.ChangeValue(self.record.physical_ref)
+        self.other_ref_box.ChangeValue(self.record.other_ref)
+        self.tags_box.ChangeValue(self.record.string_tags())
+        self.file_list_box.Set(self.record.linked_files)
+        self.created_text.Label = "Created by:\n{} - {}".format(str(self.record.created_by),
+                                                                str(self.record.created_time_string()))
+        self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
+                                                                  str(self.record.last_changed_time_string()))
+
 
 def main(record_obj):
     app = wx.App(False)
@@ -411,6 +440,6 @@ def main(record_obj):
 
 
 if __name__ == "__main__":
-    r = database_io.get_record_by_id(5)
+    r = database_io.ArchiveRecord()
     r.record_id = "New Record"
     main(r)

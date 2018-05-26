@@ -43,8 +43,8 @@ class ArchiveRecord:
     record_id = None
     title = ""
     description = ""
-    record_type = ""
-    local_auth = ""
+    record_type = None
+    local_auth = None
     start_date = datetime.datetime
     end_date = datetime.datetime
     tags = []
@@ -56,11 +56,12 @@ class ArchiveRecord:
     created_time = datetime.datetime
     last_changed_by = ""
     last_changed_time = datetime.datetime
+    tags_prompt = 'Enter tags comma separated. (eg. tag1, tag2,...)'
 
     # noinspection PyDefaultArgument
-    def __init__(self, record_id=0, title="", description="", record_type="", local_auth="",
+    def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
                  start_date=None, end_date=None, physical_ref="", other_ref="", tags=[], linked_files=[],
-                 thumb_files=[], created_by="", created_time=None, last_changed_by=None, last_changed_time=None):
+                 thumb_files=[], created_by=None, created_time=None, last_changed_by=None, last_changed_time=None):
         self.record_id = record_id
         self.title = title
         self.description = description
@@ -170,7 +171,7 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
             return "{:%d/%m/%Y %H:%Mhrs}".format(self.last_changed_time)
 
     def string_tags(self, tags_to_add=None):
-        prompt = 'Enter tags comma separated. (eg. tag1, tag2,...)'
+        prompt = self.tags_prompt
         if tags_to_add is None:
             if len(self.tags) == 0:
                 return prompt
@@ -183,16 +184,26 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
         elif tags_to_add == prompt:
             pass
         else:
-            parts = tags_to_add.split(",")
-            for i, p in enumerate(parts):
-                parts[i] = p.strip(" ")
-
-            easygui.msgbox(str(parts))
+            parts = self.format_string_to_tags(tags_to_add)
             for p in parts:
                 if p in self.tags:
                     pass
                 else:
                     self.tags.append(p)
+
+    def format_string_to_tags(self, text):
+        if text == self.tags_prompt:
+            return []
+        else:
+            parts = text.split(",")
+            tags = []
+            for p in parts:
+                p = p.strip()
+                if p == "":
+                    pass
+                else:
+                    tags.append(p.upper())
+            return tags
 
 
 def access_bin_file(filename):
@@ -342,7 +353,7 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
             start_date_stamp = None
         else:
             start_date_stamp = int(record_obj.start_date.timestamp() * 1000)
-        if record_obj.start_date is None:
+        if record_obj.end_date is None:
             end_date_stamp = None
         else:
             end_date_stamp = int(record_obj.end_date.timestamp() * 1000)
@@ -482,6 +493,12 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         else:
             pass
 
+        # Make Title and Desc None if they are empty so that it will be caught later.
+        if record_obj.title == "":
+            record_obj.title = None
+        if record_obj.description == "":
+            record_obj.description = None
+
         if record_obj.created_time is None:
             record_obj.created_time = datetime.datetime.fromtimestamp(time.time())
             record_obj.created_by = os.environ['USERNAME']
@@ -494,18 +511,24 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print(params)
 
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
-            bliss.run("INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,"
-                      "physical_ref, other_ref, tags, created_by, created_time, last_changed_by, last_changed_time)"
-                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,'
+                      'physical_ref, other_ref, tags, created_by, created_time, last_changed_by, last_changed_time)'
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                       params)
-            record_obj = format_sql_to_record_obj(bliss.one("FROM resources SELECT 1 WHERE last_changed=?",
-                                                            (record_obj.last_changed_time.timestamp() * 1000,)))
         else:
             params.append(record_id)
-            bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?, end_date=?,"
-                      "physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=? WHERE id=?", params)
+            bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
+                      "end_date=?, physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=?,"
+                      "last_changed_by=?, last_changed_time=? WHERE id=?",
+                      params)
         conn.commit()
+        record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
+                                                        (int(record_obj.last_changed_time.timestamp() * 1000),)))
         return record_obj
+    except sqlite3.IntegrityError:
+        return "IntegrityError"
+    except sqlite3.OperationalError:
+        return "OperationalError"
 
 
 def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
