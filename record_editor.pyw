@@ -205,9 +205,11 @@ class RecordEditor(wx.Frame):
 
     def update_type(self, event):
         self.set_changed()
+# Todo: Add ability to create new type.
 
     def update_local_auth(self, event):
         self.set_changed()
+# Todo: Add ability to create new type.
 
     def update_start_date(self, event):
         self.set_changed()
@@ -233,6 +235,10 @@ class RecordEditor(wx.Frame):
         else:
             pass
         self.set_changed()
+
+# Todo: Add File Adding/Linking/Removing
+
+# Todo: Add adding My List.
 
     def close_button_press(self, event):
         if self.unsaved_changes:
