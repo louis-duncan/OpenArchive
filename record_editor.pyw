@@ -1,3 +1,4 @@
+import datetime
 import wx
 import wx.adv
 import os
@@ -279,7 +280,7 @@ class RecordEditor(wx.Frame):
         if self.other_ref_box.GetValue().strip() != self.record.other_ref:
             self.unsaved_changes = True
             print("Other Ref Changed")
-            
+
         # Tags
         check_tags = self.tags_box.GetValue().split(",")
         if len(check_tags) != len(self.record.tags):
@@ -303,7 +304,7 @@ class RecordEditor(wx.Frame):
             for f in check_files:
                 if f not in self.record.linked_files:
                     self.unsaved_changes = True
-                    print("Files changed - Difference File")
+                    print("Files changed - Different File")
                     break
 
         if self.unsaved_changes:
@@ -338,12 +339,58 @@ class RecordEditor(wx.Frame):
             else:
                 return None
 
+        if str(self.start_date_picker.GetValue()) == "INVALID DateTime":
+            new_start_date = None
+        else:
+            new_start_date = datetime.datetime(self.start_date_picker.GetValue().year,
+                                               self.start_date_picker.GetValue().month + 1,
+                                               self.start_date_picker.GetValue().day)
+        if str(self.end_date_picker.GetValue()) == "INVALID DateTime":
+            new_end_date = None
+        else:
+            new_end_date = datetime.datetime(self.end_date_picker.GetValue().year,
+                                             self.end_date_picker.GetValue().month + 1,
+                                             self.end_date_picker.GetValue().day)
 
-        #Todo: Update entered data to a new record obj
+        new_tags = []
+        parts = self.tags_box.GetValue().split(",")
+        for p in parts:
+            new_tags.append(p.strip().upper())
 
-        valid = database_io.check_record(self.record)
+        new_linked_files = []
+        for i in range(self.file_list_box.GetCount()):
+            new_linked_files.append(self.file_list_box.GetString(i))
+
+        new_record_obj = database_io.ArchiveRecord(record_id=self.record.record_id,
+                                                   title=self.title_box.GetValue().strip(),
+                                                   description=self.desc_box.GetValue().strip(),
+                                                   record_type=self.type_comb.GetValue(),
+                                                   local_auth=self.local_authorities_comb.GetValue(),
+                                                   start_date=new_start_date,
+                                                   end_date=new_end_date,
+                                                   physical_ref=self.physical_ref_box.GetValue().strip(),
+                                                   other_ref=self.other_ref_box.GetValue().strip(),
+                                                   tags=new_tags,
+                                                   linked_files=new_linked_files,
+                                                   created_by=self.record.created_by,
+                                                   created_time=self.record.created_time
+                                                   )
+
+        valid = database_io.check_record(new_record_obj)
         if valid is True:
-            database_io.commit_record(record_obj=self.record)
+            suc = database_io.commit_record(record_obj=new_record_obj)
+            if suc is False:
+                dlg = wx.MessageDialog(self, "Record could not be added to the database!", style=wx.ICON_ERROR)
+                dlg.ShowModal()
+                dlg.Destroy()
+            elif type(suc) == database_io.ArchiveRecord:
+                self.record = suc
+                self.set_changed()
+            else:
+                dlg = wx.MessageDialog(self, "Don't know if the record was added or not!\nConcerning...",
+                                       style=wx.ICON_ERROR)
+                dlg.ShowModal()
+                dlg.Destroy()
         elif valid == "Bad Chars":
             dlg = wx.MessageDialog(self, "Record contains invalid characters!\nAllowed Characters:\n{}"
                                    .format(database_io.valid_chars),

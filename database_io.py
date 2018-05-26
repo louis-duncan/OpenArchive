@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+import time
 import sql
 import datetime
 import easygui
@@ -349,11 +350,17 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
             created_time_stamp = None
         else:
             created_time_stamp = int(record_obj.created_time.timestamp() * 1000)
+        if record_obj.last_changed_time is None:
+            last_changed_time_stamp = None
+        else:
+            last_changed_time_stamp = int(record_obj.last_changed_time.timestamp() * 1000)
+
         tags_string = ""
         for t in record_obj.tags:
             tags_string += str(t) + "|"
         tags_string = tags_string.strip("|")
-        record_list = [record_obj.title,
+
+        params_list = [record_obj.title,
                        record_obj.description,
                        record_type_id,
                        local_auth_id,
@@ -363,9 +370,11 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
                        record_obj.other_ref,
                        tags_string,
                        record_obj.created_by,
-                       created_time_stamp
+                       created_time_stamp,
+                       record_obj.last_changed_by,
+                       last_changed_time_stamp,
                        ]
-        return record_obj.record_id, record_list
+        return record_obj.record_id, params_list
 
 
 def return_types():
@@ -465,26 +474,38 @@ def create_cached_record(record_id=None):
         return record_object_path
 
 
-def commit_record(cached_record_path=None, record_obj=None):
-    # Todo: Add creator and changer details to commited records.
+def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
     # Commits changes or new record to db
-    if record_obj is None:
-        record_obj = access_bin_file(cached_record_path)
-    else:
-        pass
-    record_id, params = format_record_obj_to_sql(record_obj)
-    print(record_id)
-    print(params)
-    if (record_id == 0) or (record_id == "New Record") or (record_id is None):
-        bliss.run("INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,"
-                  "physical_ref, other_ref, tags, created_by, created_time)"
-                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  params)
-    else:
-        params.append(record_id)
-        bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?, end_date=?,"
-                  "physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=? WHERE id=?", params)
-    conn.commit()
+    try:
+        if record_obj is None:
+            record_obj = access_bin_file(cached_record_path)
+        else:
+            pass
+
+        if record_obj.created_time is None:
+            record_obj.created_time = datetime.datetime.fromtimestamp(time.time())
+            record_obj.created_by = os.environ['USERNAME']
+
+        record_obj.last_changed_time = datetime.datetime.fromtimestamp(time.time())
+        record_obj.last_changed_by = os.environ['USERNAME']
+
+        record_id, params = format_record_obj_to_sql(record_obj)
+        print(record_id)
+        print(params)
+
+        if (record_id == 0) or (record_id == "New Record") or (record_id is None):
+            bliss.run("INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,"
+                      "physical_ref, other_ref, tags, created_by, created_time, last_changed_by, last_changed_time)"
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                      params)
+            record_obj = format_sql_to_record_obj(bliss.one("FROM resources SELECT 1 WHERE last_changed=?",
+                                                            (record_obj.last_changed_time.timestamp() * 1000,)))
+        else:
+            params.append(record_id)
+            bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?, end_date=?,"
+                      "physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=? WHERE id=?", params)
+        conn.commit()
+        return record_obj
 
 
 def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
