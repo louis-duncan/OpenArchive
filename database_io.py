@@ -8,6 +8,7 @@ import easygui
 import pickle
 import temp
 import textdistance
+import wx
 
 __title__ = "OpenArchive"
 
@@ -347,8 +348,10 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
         return None
     else:
         pass
-        record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?", (record_obj.record_type,)))
-        local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?", (record_obj.local_auth,)))
+        record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?",
+                                       (str(record_obj.record_type),)))
+        local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?",
+                                      (str(record_obj.local_auth),)))
         if record_obj.start_date is None:
             start_date_stamp = None
         else:
@@ -507,9 +510,10 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         record_obj.last_changed_by = os.environ['USERNAME']
 
         record_id, params = format_record_obj_to_sql(record_obj)
+        files_to_link = record_obj.linked_files
         print(record_id)
         print(params)
-
+        print("Files to be linked:", files_to_link)
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
             bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,'
                       'physical_ref, other_ref, tags, created_by, created_time, last_changed_by, last_changed_time)'
@@ -522,8 +526,16 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                       "last_changed_by=?, last_changed_time=? WHERE id=?",
                       params)
         conn.commit()
+        changed_time_stamp = int(record_obj.last_changed_time.timestamp() * 1000)
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
-                                                        (int(record_obj.last_changed_time.timestamp() * 1000),)))
+                                                        (changed_time_stamp,)))
+        bliss.run("DELETE FROM file_links WHERE record_id=?", (record_obj.record_id,))
+        for f in files_to_link:
+            bliss.run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
+                      (record_obj.record_id, f, ""))
+        conn.commit()
+        record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
+                                                        (changed_time_stamp,)))
         return record_obj
     except sqlite3.IntegrityError:
         return "IntegrityError"

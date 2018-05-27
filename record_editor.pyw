@@ -1,6 +1,9 @@
 import datetime
+import time
+
 import wx
 import wx.adv
+from wx.lib import sized_controls
 import os
 import database_io
 import textdistance
@@ -343,8 +346,11 @@ class RecordEditor(wx.Frame):
             self.save_button.Disable()
 
     def file_link_clicked(self, event):
+        dlg = LoadingDialog(self)
+        dlg.Show(True)
         suc = self.record.launch_file(self.record.linked_files.index(event.GetString()))
         if suc is True:
+            dlg.Destroy()
             return None
         elif suc == "Index Error":
             msg = "File {} does not appear to be linked to this record!".format(event.GetString())
@@ -352,6 +358,7 @@ class RecordEditor(wx.Frame):
             msg = "File {} does not appear to exist!".format(event.GetString())
         else:
             msg = "File {} could not be opened for an unknown reason, which is worrying...".format(event.GetString())
+        dlg.Destroy()
         dlg = wx.MessageDialog(self, msg, "File Error", wx.OK)
         dlg.ShowModal()
         dlg.Destroy()
@@ -385,6 +392,7 @@ class RecordEditor(wx.Frame):
         new_linked_files = []
         for i in range(self.file_list_box.GetCount()):
             new_linked_files.append(self.file_list_box.GetString(i))
+        print("Files being saved:\n{}".format(new_linked_files))
 
         new_record_obj = database_io.ArchiveRecord(record_id=self.record.record_id,
                                                    title=self.title_box.GetValue().strip(),
@@ -437,6 +445,20 @@ class RecordEditor(wx.Frame):
                                                                 str(self.record.created_time_string()))
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
                                                                   str(self.record.last_changed_time_string()))
+        self.set_changed()
+
+
+class LoadingDialog(wx.lib.sized_controls.SizedDialog):
+
+    def __init__(self, *args, **kwargs):
+        super(LoadingDialog, self).__init__(title="Loading...", style=wx.STAY_ON_TOP | wx.CAPTION, *args, **kwargs)
+        pane = self.GetContentsPane()
+
+        self.loading_bar = wx.Gauge(pane, -1, 75, (110, 95), (250, -1))
+
+        self.Fit()
+
+        self.loading_bar.Pulse()
 
 
 def main(record_obj):
@@ -446,6 +468,7 @@ def main(record_obj):
 
 
 if __name__ == "__main__":
-    r = database_io.ArchiveRecord()
-    r.record_id = "New Record"
+    r = database_io.get_record_by_id(49) # ArchiveRecord()
+    #r.record_id = "New Record"
+    #r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg", r"C:\Users\louis\Desktop\test2.jpg"]
     main(r)
