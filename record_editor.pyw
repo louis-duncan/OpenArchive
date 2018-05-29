@@ -1,59 +1,62 @@
 import datetime
-import time
-
 import wx
 import wx.adv
 from wx.lib import sized_controls
+from wx.lib.pdfviewer import pdfViewer
 import os
 import database_io
 import textdistance
+
+no_preview_file = ".\\bin\\no_thumb.jpg"
+no_locate_file = ".\\bin\\no_locate.jpg"
 
 
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
 
-        wx.Frame.__init__(self, parent, title=title, size=(900, 500))
+        wx.Frame.__init__(self, parent, title=title, size=(900, 500),
+                          style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
         self.record = record_to_edit
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
-        left_column = wx.GridBagSizer(vgap=10, hgap=10)
+        column_one = wx.GridBagSizer(vgap=10, hgap=10)
 
         # Add bg panel
-        bg_panel = wx.Panel(self, size=(1000, 500))
+        bg_panel = wx.Panel(self, size=(1500, 500))
 
         # Add Record ID
         id_lbl = wx.StaticText(bg_panel, label="Record ID:")
-        left_column.Add(id_lbl, pos=(1, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(id_lbl, pos=(1, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.record_id_text = wx.StaticText(bg_panel, label=str(self.record.record_id), size=(100, -1))
-        left_column.Add(self.record_id_text, pos=(1, 2))
+        column_one.Add(self.record_id_text, pos=(1, 2))
 
         # Add Adjustable Title
         title_lbl = wx.StaticText(bg_panel, label="Title*:")
-        left_column.Add(title_lbl, (2, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(title_lbl, (2, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.title_box = wx.TextCtrl(bg_panel, value=str(self.record.title), size=(350, -1))
-        left_column.Add(self.title_box, pos=(2, 2), span=(1, 4))
+        column_one.Add(self.title_box, pos=(2, 2), span=(1, 4))
 
         # Add Adjustable Description
         desc_lbl = wx.StaticText(bg_panel, label="Description*:")
-        left_column.Add(desc_lbl, (3, 1), flag=wx.ALIGN_TOP | wx.ALIGN_RIGHT)
+        column_one.Add(desc_lbl, (3, 1), flag=wx.ALIGN_TOP | wx.ALIGN_RIGHT)
         self.desc_box = wx.TextCtrl(bg_panel, value=str(self.record.description), size=(350, 117),
                                     style=wx.TE_MULTILINE)
-        left_column.Add(self.desc_box, pos=(3, 2), span=(1, 4))
+        column_one.Add(self.desc_box, pos=(3, 2), span=(1, 4))
 
         # Add Type Selection
         type_lbl = wx.StaticText(bg_panel, label="Resource Type*:")
-        left_column.Add(type_lbl, (4, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(type_lbl, (4, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         types = database_io.return_types()
         types.sort(key=database_io.float_none_drop_other)
         types.append("Add New...")
         self.type_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=types, value=str(self.record.record_type),
                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        left_column.Add(self.type_comb, pos=(4, 2), span=(1, 4))
+        column_one.Add(self.type_comb, pos=(4, 2), span=(1, 4))
 
         # Add Local Authority Selection
         local_authorities_lbl = wx.StaticText(bg_panel, label="Local Authority*:")
-        left_column.Add(local_authorities_lbl, (5, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(local_authorities_lbl, (5, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         local_authorities = database_io.return_local_authorities()
         local_authorities.sort(key=database_io.float_none_drop_other)
         local_authorities.append("Add New...")
@@ -61,11 +64,11 @@ class RecordEditor(wx.Frame):
                                                   value=str(self.record.local_auth),
                                                   style=wx.CB_DROPDOWN | wx.CB_READONLY,
                                                   name="Click to choose Local Authority")
-        left_column.Add(self.local_authorities_comb, pos=(5, 2), span=(1, 4))
+        column_one.Add(self.local_authorities_comb, pos=(5, 2), span=(1, 4))
 
         # Add date selectors
         start_date_lbl = wx.StaticText(bg_panel, label="Start Date:")
-        left_column.Add(start_date_lbl, (6, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(start_date_lbl, (6, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.start_date_picker = wx.adv.DatePickerCtrl(bg_panel, size=(120, -1), style=wx.adv.DP_DROPDOWN
                                                                                        | wx.adv.DP_SHOWCENTURY
                                                                                        | wx.adv.DP_ALLOWNONE)
@@ -74,12 +77,12 @@ class RecordEditor(wx.Frame):
                                    self.record.start_date.month - 1,  # Because for some reason the months start at 0.
                                    self.record.start_date.year)
             self.start_date_picker.SetValue(start_dt)
-        left_column.Add(self.start_date_picker, pos=(6, 2))
+        column_one.Add(self.start_date_picker, pos=(6, 2))
 
-        left_column.Add((27, -1), pos=(6, 3))  # Gap
+        column_one.Add((27, -1), pos=(6, 3))  # Gap
 
         end_date_lbl = wx.StaticText(bg_panel, label="End Date:")
-        left_column.Add(end_date_lbl, (6, 4), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(end_date_lbl, (6, 4), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.end_date_picker = wx.adv.DatePickerCtrl(bg_panel, size=(120, -1), style=wx.adv.DP_DROPDOWN
                                                                                      | wx.adv.DP_SHOWCENTURY
                                                                                      | wx.adv.DP_ALLOWNONE)
@@ -88,38 +91,38 @@ class RecordEditor(wx.Frame):
                                  self.record.end_date.month - 1,  # Because for some reason the months start at 0.
                                  self.record.end_date.year)
             self.end_date_picker.SetValue(end_dt)
-        left_column.Add(self.end_date_picker, pos=(6, 5))
+        column_one.Add(self.end_date_picker, pos=(6, 5))
 
         # Add Physical and Other Refs
         physical_ref_lbl = wx.StaticText(bg_panel, label="Physical Ref:")
-        left_column.Add(physical_ref_lbl, (7, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(physical_ref_lbl, (7, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.physical_ref_box = wx.TextCtrl(bg_panel, size=(120, -1))
         if self.record.physical_ref is not None:
             self.physical_ref_box.SetValue(self.record.physical_ref)
-        left_column.Add(self.physical_ref_box, (7, 2))
+        column_one.Add(self.physical_ref_box, (7, 2))
 
         other_ref_lbl = wx.StaticText(bg_panel, label="Other Ref:")
-        left_column.Add(other_ref_lbl, (7, 4), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(other_ref_lbl, (7, 4), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.other_ref_box = wx.TextCtrl(bg_panel, size=(120, -1))
         if self.record.other_ref is not None:
             self.other_ref_box.SetValue(self.record.other_ref)
-        left_column.Add(self.other_ref_box, (7, 5))
+        column_one.Add(self.other_ref_box, (7, 5))
 
         # Add Tags Box
         tags_lbl = wx.StaticText(bg_panel, label="Tags:")
-        left_column.Add(tags_lbl, (8, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        column_one.Add(tags_lbl, (8, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.tags_box = wx.TextCtrl(bg_panel, value=str(self.record.string_tags()), size=(350, -1))
-        left_column.Add(self.tags_box, pos=(8, 2), span=(1, 4))
+        column_one.Add(self.tags_box, pos=(8, 2), span=(1, 4))
 
         # New Column!
-        right_column = wx.GridBagSizer(vgap=10, hgap=10)
-        file_list_lbl = wx.StaticText(bg_panel, label="Linked Files:")
-        right_column.Add(file_list_lbl, (1, 1))
+        column_two = wx.GridBagSizer(vgap=10, hgap=10)
+        file_list_lbl = wx.StaticText(bg_panel, label="Linked Files (Single click to Preview, Double click to open):")
+        column_two.Add(file_list_lbl, (1, 1))
         file_list = self.record.linked_files
         if file_list is None:
             file_list = []
         self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=file_list)
-        right_column.Add(self.file_list_box, (2, 1))
+        column_two.Add(self.file_list_box, (2, 1))
 
         # File Buttons
         file_buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -132,9 +135,9 @@ class RecordEditor(wx.Frame):
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
         file_buttons_sizer.Add(self.remove_file_button)
 
-        right_column.Add(file_buttons_sizer, (3, 1), flag=wx.EXPAND)
+        column_two.Add(file_buttons_sizer, (3, 1), flag=wx.EXPAND)
 
-        right_column.Add((0, 20), (4, 1), flag=wx.EXPAND)
+        column_two.Add((0, 20), (4, 1), flag=wx.EXPAND)
 
         # Add Save and Close Buttons
         main_buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -153,23 +156,34 @@ class RecordEditor(wx.Frame):
         self.close_button = wx.Button(bg_panel, size=(100, -1), label="Close")
         main_buttons_sizer.Add(self.close_button)
 
-        right_column.Add(main_buttons_sizer, (5, 1), flag=wx.EXPAND)
+        column_two.Add(main_buttons_sizer, (5, 1), flag=wx.EXPAND)
 
         # Add created and changed info
         self.created_text = wx.StaticText(bg_panel, label="Created by:\n{} - {}"
                                      .format(str(self.record.created_by), str(self.record.created_time_string())))
-        right_column.Add(self.created_text, (6, 1))
+        column_two.Add(self.created_text, (6, 1))
 
         self.changed_text = wx.StaticText(bg_panel, label="Last Changed:\n{} - {}"
                                      .format(str(self.record.last_changed_by),
                                              str(self.record.last_changed_time_string())))
-        right_column.Add(self.changed_text, (7, 1))
+        column_two.Add(self.changed_text, (7, 1))
+
+        # New Column!
+        column_three = wx.GridBagSizer(vgap=10, hgap=10)
+
+        # Previewer
+        previewer_lbl = wx.StaticText(bg_panel, label="Preview:")
+        column_three.Add(previewer_lbl, (1, 1))
+        self.previewer = pdfViewer(bg_panel, wx.NewId(), wx.DefaultPosition, (315, 315),
+                                   style=wx.HSCROLL | wx.VSCROLL | wx.SUNKEN_BORDER)
+        column_three.Add(self.previewer, (2, 1))
 
         # Add a spacer to the sizer
-        right_column.Add((20, 10), pos=(8, 2))
+        column_three.Add((10, 10), pos=(3, 2))
 
-        sizer.Add(left_column, 0, wx.EXPAND, 0)
-        sizer.Add(right_column, 0, wx.EXPAND, 0)
+        sizer.Add(column_one, 0, wx.EXPAND, 0)
+        sizer.Add(column_two, 0, wx.EXPAND, 0)
+        sizer.Add(column_three, 0, wx.EXPAND, 0)
 
         self.SetSizerAndFit(sizer)
 
@@ -191,8 +205,9 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_TEXT, self.update_other_ref, self.other_ref_box)
         self.Bind(wx.EVT_TEXT, self.update_tags, self.tags_box)
 
-        # File Link Double-click
-        self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_clicked, self.file_list_box)
+        # File Link Box
+        self.Bind(wx.EVT_LISTBOX, self.file_link_selected, self.file_list_box)
+        self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_double_clicked, self.file_list_box)
 
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
@@ -345,7 +360,22 @@ class RecordEditor(wx.Frame):
         else:
             self.save_button.Disable()
 
-    def file_link_clicked(self, event):
+    def file_link_selected(self, event=None):
+        path = self.file_list_box.GetString(self.file_list_box.GetSelection())
+        if os.path.exists(path):
+            file_extension = path.split(".")[-1].upper()
+            if file_extension in ("PDF", "JPG", "JPEG", "BMP", "PNG"):
+                try:
+                    self.previewer.LoadFile(path)
+                except RuntimeError:
+                    print("Tried to load a bad file type!")
+                    self.previewer.LoadFile(no_preview_file)
+            else:
+                self.previewer.LoadFile(no_preview_file)
+        else:
+            self.previewer.LoadFile(no_locate_file)
+
+    def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
         dlg.Show(True)
         suc = self.record.launch_file(self.record.linked_files.index(event.GetString()))
