@@ -8,7 +8,7 @@ import easygui
 import pickle
 import temp
 import textdistance
-import wx
+import shutil
 
 __title__ = "OpenArchive"
 
@@ -111,7 +111,12 @@ class ArchiveRecord:
         else:
             try:
                 if os.path.exists(self.linked_files[file_index]):
-                    fail = os.startfile(self.linked_files[file_index])
+                    # Cache file
+                    file_extension = self.linked_files[file_index].split(".")[-1]
+                    fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", TEMP_DATA_LOCATION)
+                    os.close(fd)
+                    shutil.copy2(self.linked_files[file_index], cached_path)
+                    fail = os.startfile(cached_path)
                     if fail:
                         return "Unknown Error"
                     else:
@@ -482,7 +487,7 @@ def create_cached_record(record_id=None):
     if record_obj is None:
         return None
     else:
-        fd, record_object_path = temp.mkstemp(".dat", "OATEMP", TEMP_DATA_LOCATION)
+        fd, record_object_path = temp.mkstemp(".dat", "OATEMP_", TEMP_DATA_LOCATION)
         os.close(fd)
         save_bin_file(record_object_path, record_obj)
         return record_object_path
@@ -623,7 +628,7 @@ def score_results(results, text):
 
 
 def check_record(record_obj: ArchiveRecord):
-    if "" in (record_obj.title.strip(), record_obj.title.strip()):
+    if "" in (record_obj.title.strip(), record_obj.description.strip()):
         return "Missing Field"
     else:
         title_valid = check_text_is_valid(record_obj.title)
@@ -632,3 +637,13 @@ def check_record(record_obj: ArchiveRecord):
             return True
         else:
             return "Bad Chars"
+
+
+def add_new_type(type_string):
+    bliss.run("INSERT INTO types (type_text) values (?)", (type_string,))
+    conn.commit()
+
+
+def add_new_local_authority(local_auth_string):
+    bliss.run("INSERT INTO local_authorities (local_auth) values (?)", (local_auth_string,))
+    conn.commit()

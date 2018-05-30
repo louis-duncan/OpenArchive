@@ -1,4 +1,5 @@
 import datetime
+import sqlite3
 import wx
 import wx.adv
 from wx.lib import sized_controls
@@ -9,6 +10,7 @@ import textdistance
 
 no_preview_file = ".\\bin\\no_thumb.jpg"
 no_locate_file = ".\\bin\\no_locate.jpg"
+__title__ = "OpenArchive - Record Viewer"
 
 
 class RecordEditor(wx.Frame):
@@ -160,12 +162,12 @@ class RecordEditor(wx.Frame):
 
         # Add created and changed info
         self.created_text = wx.StaticText(bg_panel, label="Created by:\n{} - {}"
-                                     .format(str(self.record.created_by), str(self.record.created_time_string())))
+                                          .format(str(self.record.created_by), str(self.record.created_time_string())))
         column_two.Add(self.created_text, (6, 1))
 
         self.changed_text = wx.StaticText(bg_panel, label="Last Changed:\n{} - {}"
-                                     .format(str(self.record.last_changed_by),
-                                             str(self.record.last_changed_time_string())))
+                                          .format(str(self.record.last_changed_by),
+                                                  str(self.record.last_changed_time_string())))
         column_two.Add(self.changed_text, (7, 1))
 
         # New Column!
@@ -209,6 +211,7 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_LISTBOX, self.file_link_selected, self.file_list_box)
         self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_double_clicked, self.file_list_box)
 
+
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
 
@@ -222,12 +225,96 @@ class RecordEditor(wx.Frame):
         self.set_changed()
 
     def update_type(self, event):
+        selection = self.type_comb.GetStringSelection()
+        if selection == "Add New...":
+            valid = False
+            new_type = ""
+            while valid is not True:
+                # Get new type.
+                msg = "Enter new resource type:\n" \
+                      "'Type: Sub-Type'"
+                input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Type")
+                input_dlg.SetValue(new_type)
+                if input_dlg.ShowModal() == wx.ID_OK:
+                    new_type = input_dlg.GetValue()
+                else:
+                    # I no new type given, quit here.
+                    self.type_comb.SetSelection(0)
+                    input_dlg.Destroy()
+                    return None
+                input_dlg.Destroy()
+                valid = database_io.check_text_is_valid(new_type)
+                if valid is True:
+                    pass
+                else:
+                    pass
+                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nAllowed Characters:\n{}"
+                                                 .format(database_io.valid_chars),
+                                                 "Error", style=wx.ICON_ERROR)
+                    error_dlg.ShowModal()
+                    error_dlg.Destroy()
+            # Add to database.
+            try:
+                database_io.add_new_type(new_type)
+            except sqlite3.IntegrityError:
+                error_dlg = wx.MessageDialog(self, "A type of this name already exists!",
+                                             "Error", style=wx.ICON_ERROR)
+                error_dlg.ShowModal()
+                error_dlg.Destroy()
+                self.type_comb.SetSelection(0)
+                return None
+            # Add to list.
+            self.type_comb.Append(new_type)
+            # Set as current selected value.
+            self.type_comb.SetSelection(self.type_comb.FindString(new_type))
+        else:
+            pass
         self.set_changed()
-# Todo: Add ability to create new type.
 
     def update_local_auth(self, event):
+        selection = self.local_authorities_comb.GetStringSelection()
+        if selection == "Add New...":
+            valid = False
+            new_local_auth = ""
+            while valid is not True:
+                # Get new type.
+                msg = "Enter new local authority:"
+                input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Local Authority")
+                input_dlg.SetValue(new_local_auth)
+                if input_dlg.ShowModal() == wx.ID_OK:
+                    new_local_auth = input_dlg.GetValue()
+                else:
+                    # I no new auth given, quit here.
+                    self.local_authorities_comb.SetSelection(0)
+                    input_dlg.Destroy()
+                    return None
+                input_dlg.Destroy()
+                valid = database_io.check_text_is_valid(new_local_auth)
+                if valid is True:
+                    pass
+                else:
+                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nAllowed Characters:\n{}"
+                                                 .format(database_io.valid_chars),
+                                                 "Error", style=wx.ICON_ERROR)
+                    error_dlg.ShowModal()
+                    error_dlg.Destroy()
+            # Add to database.
+            try:
+                database_io.add_new_local_authority(new_local_auth)
+            except sqlite3.IntegrityError:
+                error_dlg = wx.MessageDialog(self, "A local authority of this name already exists!",
+                                             "Error", style=wx.ICON_ERROR)
+                error_dlg.ShowModal()
+                error_dlg.Destroy()
+                self.local_authorities_comb.SetSelection(0)
+                return None
+            # Add to list.
+            self.local_authorities_comb.Append(new_local_auth)
+            # Set as current selected value.
+            self.local_authorities_comb.SetSelection(self.local_authorities_comb.FindString(new_local_auth))
+        else:
+            pass
         self.set_changed()
-# Todo: Add ability to create new type.
 
     def update_start_date(self, event):
         self.set_changed()
@@ -254,13 +341,15 @@ class RecordEditor(wx.Frame):
             pass
         self.set_changed()
 
-# Todo: Add File Adding/Linking/Removing
+    # Todo: Add File Adding/Linking/Removing
 
-# Todo: Add adding My List.
+    # Todo: Add adding My List.
 
     def close_button_press(self, event):
         if self.unsaved_changes:
-            dlg = wx.MessageDialog(self, "Do you want to save changes to Record: {}\n'{}'"
+            dlg = wx.MessageDialog(self, "Do you want to save changes to Record: {}\n"
+                                         "\n"
+                                         "If not saved, any changes including linked files will not be stored in the archive."
                                    .format(self.record.record_id, self.record.title),
                                    style=wx.YES_NO | wx.CANCEL | wx.CANCEL_DEFAULT
                                          | wx.ICON_INFORMATION, caption="Unsaved Changes")
@@ -268,7 +357,11 @@ class RecordEditor(wx.Frame):
             dlg.Destroy()
             if resp == wx.ID_YES:
                 # process for saving record
-                self.save_record()
+                save_completed = self.save_record()
+                if save_completed:
+                    pass
+                else:
+                    return None
             elif resp == wx.ID_NO:
                 pass
             else:
@@ -333,7 +426,7 @@ class RecordEditor(wx.Frame):
         check_tags = self.record.format_string_to_tags(self.tags_box.GetValue().strip())
         if len(check_tags) != len(self.record.tags):
             self.unsaved_changes = True
-            print("Tags Changed - Len\n",check_tags,self.record.tags,"\n",len(check_tags),len(self.record.tags))
+            print("Tags Changed - Len\n", check_tags, self.record.tags, "\n", len(check_tags), len(self.record.tags))
         else:
             for t in check_tags:
                 if t.upper().strip() not in self.record.tags:
@@ -404,7 +497,7 @@ class RecordEditor(wx.Frame):
             if resp == wx.ID_YES:
                 pass
             else:
-                return None
+                return False
 
         if str(self.start_date_picker.GetValue()) == "INVALID DateTime":
             new_start_date = None
@@ -422,7 +515,6 @@ class RecordEditor(wx.Frame):
         new_linked_files = []
         for i in range(self.file_list_box.GetCount()):
             new_linked_files.append(self.file_list_box.GetString(i))
-        print("Files being saved:\n{}".format(new_linked_files))
 
         new_record_obj = database_io.ArchiveRecord(record_id=self.record.record_id,
                                                    title=self.title_box.GetValue().strip(),
@@ -462,13 +554,18 @@ class RecordEditor(wx.Frame):
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
+        return True
 
     def refresh_all(self):
+        if self.record.title is None:
+            self.record.title = ""
+        if self.record.description is None:
+            self.record.description = ""
         self.record_id_text.Label = str(self.record.record_id)
-        self.title_box.ChangeValue(self.record.title)
-        self.desc_box.ChangeValue(self.record.description)
-        self.physical_ref_box.ChangeValue(self.record.physical_ref)
-        self.other_ref_box.ChangeValue(self.record.other_ref)
+        self.title_box.ChangeValue(str(self.record.title))
+        self.desc_box.ChangeValue(str(self.record.description))
+        self.physical_ref_box.ChangeValue(str(self.record.physical_ref))
+        self.other_ref_box.ChangeValue(str(self.record.other_ref))
         self.tags_box.ChangeValue(self.record.string_tags())
         self.file_list_box.Set(self.record.linked_files)
         self.created_text.Label = "Created by:\n{} - {}".format(str(self.record.created_by),
@@ -493,12 +590,12 @@ class LoadingDialog(wx.lib.sized_controls.SizedDialog):
 
 def main(record_obj):
     app = wx.App(False)
-    frame = RecordEditor(None, "OpenArchive - View/Edit Record", record_obj)
+    frame = RecordEditor(None, __title__, record_obj)
     app.MainLoop()
 
 
 if __name__ == "__main__":
-    r = database_io.get_record_by_id(49) # ArchiveRecord()
-    #r.record_id = "New Record"
-    #r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg", r"C:\Users\louis\Desktop\test2.jpg"]
+    r = database_io.ArchiveRecord()
+    r.record_id = "New Record"
+    r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg", r"C:\Users\louis\Desktop\test2.jpg"]
     main(r)
