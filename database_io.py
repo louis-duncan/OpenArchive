@@ -19,6 +19,7 @@ valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&(
 DATABASE_LOCATION = "bin\\archive.db"
 ARCHIVE_LOCATION = os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
 TEMP_DATA_LOCATION = os.path.join(os.environ["TEMP"], "OpenArchive")
+EPOCH = datetime.datetime(1970, 1, 1)
 
 if os.path.exists(DATABASE_LOCATION):
     conn = sqlite3.connect(DATABASE_LOCATION)
@@ -299,19 +300,19 @@ def format_sql_to_record_obj(db_record_object):
     if db_record_object.start_date is None:
         start_date = None
     else:
-        start_date = datetime.datetime.fromtimestamp(int(db_record_object.start_date / 1000))
+        start_date = EPOCH + datetime.timedelta(milliseconds=db_record_object.start_date)
     if db_record_object.end_date is None:
         end_date = None
     else:
-        end_date = datetime.datetime.fromtimestamp(int(db_record_object.end_date / 1000))
+        end_date = EPOCH + datetime.timedelta(milliseconds=db_record_object.end_date)
     if db_record_object.created_time is None:
         created_time = None
     else:
-        created_time = datetime.datetime.fromtimestamp(int(db_record_object.created_time / 1000))
+        created_time = EPOCH + datetime.timedelta(milliseconds=db_record_object.created_time)
     if db_record_object.last_changed_time is None:
         last_changed_time = None
     else:
-        last_changed_time = datetime.datetime.fromtimestamp(int(db_record_object.last_changed_time / 1000))
+        last_changed_time = EPOCH + datetime.timedelta(milliseconds=db_record_object.last_changed_time)
 
     # Create tag and item lists
     if db_record_object.tags is not None:
@@ -360,19 +361,19 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
         if record_obj.start_date is None:
             start_date_stamp = None
         else:
-            start_date_stamp = int(record_obj.start_date.timestamp() * 1000)
+            start_date_stamp = int((record_obj.start_date - EPOCH).total_seconds() * 1000)
         if record_obj.end_date is None:
             end_date_stamp = None
         else:
-            end_date_stamp = int(record_obj.end_date.timestamp() * 1000)
+            end_date_stamp = int((record_obj.end_date - EPOCH).total_seconds() * 1000)
         if record_obj.created_time is None:
             created_time_stamp = None
         else:
-            created_time_stamp = int(record_obj.created_time.timestamp() * 1000)
+            created_time_stamp = int((record_obj.created_time - EPOCH).total_seconds() * 1000)
         if record_obj.last_changed_time is None:
             last_changed_time_stamp = None
         else:
-            last_changed_time_stamp = int(record_obj.last_changed_time.timestamp() * 1000)
+            last_changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
 
         tags_string = ""
         for t in record_obj.tags:
@@ -531,7 +532,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                       "last_changed_by=?, last_changed_time=? WHERE id=?",
                       params)
         conn.commit()
-        changed_time_stamp = int(record_obj.last_changed_time.timestamp() * 1000)
+        changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))
         bliss.run("DELETE FROM file_links WHERE record_id=?", (record_obj.record_id,))

@@ -211,7 +211,6 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_LISTBOX, self.file_link_selected, self.file_list_box)
         self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_double_clicked, self.file_list_box)
 
-
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
 

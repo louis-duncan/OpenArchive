@@ -59,7 +59,7 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIV
         elif choice == choices[3]:
             access_users_list()
         elif choice == choices[4]:
-            #r = database_io.get_record_by_id(49)
+            #r = database_io.get_record_by_id(66)
             r = database_io.ArchiveRecord()
             r.record_id = "New Record"
             record_editor.main(r)
