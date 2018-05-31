@@ -9,6 +9,11 @@ import os
 import database_io
 import textdistance
 
+import PIL
+import PIL.Image
+from PyPDF2 import PdfFileWriter, PdfFileReader
+import temp
+
 no_preview_file = ".\\bin\\no_thumb.jpg"
 no_locate_file = ".\\bin\\no_locate.jpg"
 __title__ = "OpenArchive - Record Viewer"
@@ -146,23 +151,23 @@ class RecordEditor(wx.Frame):
 
         column_two.Add(file_buttons_sizer, (3, 1), flag=wx.EXPAND)
 
-        column_two.Add((0, 20), (4, 1), flag=wx.EXPAND)
+        column_two.Add((0, 0), (4, 1), flag=wx.EXPAND)
 
         # Add Save and Close Buttons
         main_buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.save_button = wx.Button(bg_panel, size=(100, -1), label="Save Changes", name="Save Changes to Record")
+        self.save_button = wx.Button(bg_panel, size=(100, 35), label="Save Changes", name="Save Changes to Record")
         self.save_button.Disable()
         main_buttons_sizer.Add(self.save_button)
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
-        self.add_to_list_button = wx.Button(bg_panel, size=(100, -1), label="Add To My List")
+        self.add_to_list_button = wx.Button(bg_panel, size=(100, 35), label="Add To My List")
         main_buttons_sizer.Add(self.add_to_list_button)
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
-        self.close_button = wx.Button(bg_panel, size=(100, -1), label="Close")
+        self.close_button = wx.Button(bg_panel, size=(100, 35), label="Close")
         main_buttons_sizer.Add(self.close_button)
 
         column_two.Add(main_buttons_sizer, (5, 1), flag=wx.EXPAND)
@@ -170,12 +175,15 @@ class RecordEditor(wx.Frame):
         # Add created and changed info
         self.created_text = wx.StaticText(bg_panel, label="Created by:\n{} - {}"
                                           .format(str(self.record.created_by), str(self.record.created_time_string())))
-        column_two.Add(self.created_text, (6, 1))
+
+        column_two.Add((0, 0), (6, 1), flag=wx.EXPAND)
+
+        column_two.Add(self.created_text, (7, 1))
 
         self.changed_text = wx.StaticText(bg_panel, label="Last Changed:\n{} - {}"
                                           .format(str(self.record.last_changed_by),
                                                   str(self.record.last_changed_time_string())))
-        column_two.Add(self.changed_text, (7, 1))
+        column_two.Add(self.changed_text, (8, 1))
 
         # New Column!
         column_three = wx.GridBagSizer(vgap=10, hgap=10)
@@ -189,7 +197,7 @@ class RecordEditor(wx.Frame):
 
         # Previewed file name.
         self.previewer_file_name_lbl = wx.StaticText(bg_panel, label="#############################################",
-                                                     style=wx.ST_NO_AUTORESIZE | wx.ST_ELLIPSIZE_START)
+                                                     style=wx.ALIGN_RIGHT | wx.ST_ELLIPSIZE_MIDDLE)
         self.previewer_file_name_lbl.SetLabel("")
         column_three.Add(self.previewer_file_name_lbl, (3, 1))
 
@@ -357,7 +365,7 @@ class RecordEditor(wx.Frame):
             pass
         self.set_changed()
 
-    # Todo: Add File Adding/Linking/Removing
+    # Todo: Add File Removing
 
     # Todo: Add adding My List.
 
@@ -508,7 +516,8 @@ class RecordEditor(wx.Frame):
         if (self.record.record_id == "New Record") or (self.record.record_id == 0):
             pass
         else:
-            dlg = wx.MessageDialog(self, "Are you sure you want to permanently save changes?", "Confirm Save",
+            dlg = wx.MessageDialog(self, "Are you sure you want to save changes?\n\nSaving will permanently update "
+                                         "the record with the newly entered data.", "Confirm Save",
                                    style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
             resp = dlg.ShowModal()
             dlg.Destroy()
@@ -553,18 +562,18 @@ class RecordEditor(wx.Frame):
                 self.refresh_all()
                 return None
             else:
-                error_msg = "Record not added due to: {}!\nConcerning...".format(suc)
+                error_msg = "Record not added due to:\n\n{}!\nConcerning...".format(suc)
             dlg = wx.MessageDialog(self, error_msg, style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
         elif valid == "Bad Chars":
-            dlg = wx.MessageDialog(self, "Record contains invalid characters!\nDisallowed Characters:\n{}"
+            dlg = wx.MessageDialog(self, "Record contains invalid characters!\n\nDisallowed Characters:\n{}"
                                    .format(database_io.invalid_chars),
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
         else:
-            dlg = wx.MessageDialog(self, "Record is missing required fields!\nFields marked with an * must be filled",
+            dlg = wx.MessageDialog(self, "Record is missing required fields!\n\nFields marked with an * must be filled",
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
@@ -617,6 +626,8 @@ class RecordEditor(wx.Frame):
         # Add the cached dir to the temp dir list
         self.temp_files.append(new_file_path)
         self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
+        self.file_list_box.SetSelection(len(self.temp_files) - 1)
+        self.file_link_selected()
         self.set_changed()
 
     def merge_and_link_multiple_files(self, event):
@@ -631,19 +642,71 @@ class RecordEditor(wx.Frame):
             return None
         else:
             file_paths = file_open_dlg.GetPaths()
+
+        # If only one file was selected, skip, and link it as a single file.
+        if len(file_paths) == 1:
+            self.link_new_file(new_file_path=file_paths[0])
+            return None
+        else:
+            pass
+
         # Get a name for the new file.
         t = datetime.datetime.fromtimestamp(time.time())
-        new_file_name = "PDF Merge {}{}{}{}{}.pdf".format(str(t.year)[2:4],
-                                                          str(t.month).zfill(2),
-                                                          str(t.day).zfill(2),
-                                                          str(t.hour).zfill(2),
-                                                          str(t.minute).zfill(2))
+        new_file_name = "PDF Merge {}{}{}{}{}{}.pdf".format(str(t.year)[2:4],
+                                                            str(t.month).zfill(2),
+                                                            str(t.day).zfill(2),
+                                                            str(t.hour).zfill(2),
+                                                            str(t.minute).zfill(2),
+                                                            str(t.second).zfill(2)
+                                                            )
         new_file_path = os.path.join(database_io.TEMP_DATA_LOCATION, new_file_name)
-        loading_dlg = LoadingDialog(self)
-        loading_dlg.Show(True)
-        loading_dlg.loading_bar.Pulse()
-        suc = database_io.join_files(file_paths, new_file_path)
+
+        loading_dlg = wx.ProgressDialog("Merge Files", "Merging files...", len(file_paths))
+        loading_dlg.ShowModal()
+
+        try:
+            output = PdfFileWriter()
+            part_files_handles = []  # [fh, created=True/False]
+
+            for progress, input_file in enumerate(file_paths):
+                if input_file.endswith('.pdf'):
+                    fh = open(input_file, 'rb')
+                    part_files_handles.append([fh, False])
+                    input = PdfFileReader(fh)
+                    num_pages = input.getNumPages()
+
+                    for i in range(0, num_pages):
+                        output.addPage(input.getPage(i))
+
+                else:  # input_file isn't pdf ex. jpeg, png
+                    im = PIL.Image.open(input_file)
+                    fd, input_file_pdf = temp.mkstemp(dir=os.environ["TEMP"])
+                    os.close(fd)
+                    im.save(input_file_pdf, 'PDF', resoultion=100.0)
+
+                    fh = open(input_file_pdf, 'rb')
+                    part_files_handles.append([fh, True])
+                    input = PdfFileReader(fh)
+                    num_pages = input.getNumPages()
+
+                    for i in range(0, num_pages):
+                        output.addPage(input.getPage(i))
+                loading_dlg.Update(progress + 1)
+
+            with open(new_file_path, 'wb') as outputStream:
+                output.write(outputStream)
+
+            for f in part_files_handles:
+                part_path = f[0].name
+                f[0].close()  # Close each file.
+                if f[1]:
+                    os.remove(part_path)  # If 'created' flag is True, remove file a it was created in this process.
+                suc = True
+        except:
+            suc = False
+
         loading_dlg.Destroy()
+
         if suc is False:
             dlg = wx.MessageDialog(self, "Could not merge the files!", "Error")
             dlg.ShowModal()
@@ -680,7 +743,4 @@ def main(record_obj):
 if __name__ == "__main__":
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
-    r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg",
-                      r"C:\Users\louis\Desktop\test2.jpg",
-                      r"C:\Users\louis\Desktop\KT_Flyer2.pdf"]
     main(r)
