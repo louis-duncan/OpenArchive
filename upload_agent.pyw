@@ -13,21 +13,15 @@ __author__ = "Louis Thurman"
 no_thumb_file = ".\\bin\\no_thumb.jpg"
 
 
-def join_files(file_paths=None):
-    if file_paths is None:
-        file_paths = easygui.fileopenbox("Select Files To Combine",
-                                         __title__ + " - Combine to PDF",
-                                         os.path.join(os.environ["HOMEPATH"], "*.jpg"),
-                                         [".jpg", ".pdf"],
-                                         True)
-    else:
-        pass
-
+def join_files(file_paths=None, output_path=None):
     if file_paths is None:
         return None
     else:
-        fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
-        os.close(fd)
+        if output_path is None:
+            fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
+            os.close(fd)
+        else:
+            pass
         err = im2pdf.union(file_paths, output_path)
         if err:
             easygui.msgbox('The PDF could not be created!',

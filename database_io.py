@@ -9,12 +9,12 @@ import pickle
 import temp
 import textdistance
 import shutil
+import im2pdf_fix.im2pdf as im2pdf
 
 __title__ = "OpenArchive"
 
 # noinspection SpellCheckingInspection
-valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?*# \n\t" \
-              ""
+invalid_chars = ""
 
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"
@@ -107,17 +107,23 @@ class ArchiveRecord:
 
         return "{} - {} - {}".format(id_string, title_string.ljust(title_len), desc_string.ljust(desc_len))
 
-    def launch_file(self, file_index=0):
-        if self.linked_files is None:
+    def launch_file(self, file_index=0, file_path=None):
+        if (self.linked_files is None) and (file_path is None):
             pass
         else:
             try:
-                if os.path.exists(self.linked_files[file_index]):
+                print(file_path)
+                if file_path is not None:
+                    path = file_path
+                else:
+                    path = self.linked_files[file_index]
+                print(path)
+                if os.path.exists(path):
                     # Cache file
-                    file_extension = self.linked_files[file_index].split(".")[-1]
+                    file_extension = path.split(".")[-1]
                     fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", TEMP_DATA_LOCATION)
                     os.close(fd)
-                    shutil.copy2(self.linked_files[file_index], cached_path)
+                    shutil.copy2(path, cached_path)
                     fail = os.startfile(cached_path)
                     if fail:
                         return "Unknown Error"
@@ -246,11 +252,11 @@ def check_text_is_valid(text):
         valid = True
         bad_chars = []
         for c in text:
-            if c in valid_chars:
-                pass
-            else:
+            if c in invalid_chars:
                 valid = False
                 bad_chars.append(c)
+            else:
+                pass
         if valid:
             return True
         else:
@@ -538,8 +544,13 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                                                         (changed_time_stamp,)))
         bliss.run("DELETE FROM file_links WHERE record_id=?", (record_obj.record_id,))
         for f in files_to_link:
+            link_f = f
+            if link_f.startswith(ARCHIVE_LOCATION): # If file in archive, re-link.
+                pass
+            else: # Move the file from it's current location to the archive.
+                link_f = move_file_to_archive(f)
             bliss.run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
-                      (record_obj.record_id, f, ""))
+                      (record_obj.record_id, link_f, ""))
         conn.commit()
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))
@@ -566,6 +577,12 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
         return scored_results
     else:
         return base_list
+
+
+def move_file_to_archive(cached_path=""):
+    new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION)
+    new_full_path = os.path.join(new_root, os.path.basename(cached_path))
+    return shutil.copy2(cached_path, new_full_path)
 
 
 def score_results(results, text):
@@ -649,3 +666,23 @@ def add_new_type(type_string):
 def add_new_local_authority(local_auth_string):
     bliss.run("INSERT INTO local_authorities (local_auth) values (?)", (local_auth_string,))
     conn.commit()
+
+
+def move_file_to_cache(new_file_path):
+    return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
+
+
+def join_files(file_paths=None, output_path=None):
+    if file_paths is None:
+        return None
+    else:
+        if output_path is None:
+            fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
+            os.close(fd)
+        else:
+            pass
+        err = im2pdf.union(file_paths, output_path)
+        if err:
+            return False
+        else:
+            return output_path

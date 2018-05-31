@@ -1,5 +1,6 @@
 import datetime
 import sqlite3
+import time
 import wx
 import wx.adv
 from wx.lib import sized_controls
@@ -120,13 +121,15 @@ class RecordEditor(wx.Frame):
         column_two = wx.GridBagSizer(vgap=10, hgap=10)
         file_list_lbl = wx.StaticText(bg_panel, label="Linked Files (Single click to Preview, Double click to open):")
         column_two.Add(file_list_lbl, (1, 1))
-        display_file_list = []
+        self.temp_files = []
+        self.display_file_list = []
         if not self.record.linked_files:
             pass
         else:
             for f in self.record.linked_files:
-                display_file_list.append(os.path.basename(f))
-        self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=display_file_list,
+                self.temp_files.append(f)
+                self.display_file_list.append(format_path_to_title(os.path.basename(f)))
+        self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=self.display_file_list,
                                         style=wx.LB_HSCROLL)
         column_two.Add(self.file_list_box, (2, 1))
 
@@ -221,6 +224,10 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_LISTBOX, self.file_link_selected, self.file_list_box)
         self.Bind(wx.EVT_LISTBOX_DCLICK, self.file_link_double_clicked, self.file_list_box)
 
+        # File Management Buttons
+        self.Bind(wx.EVT_BUTTON, self.link_new_file, self.upload_single_button)
+        self.Bind(wx.EVT_BUTTON, self.merge_and_link_multiple_files, self.upload_multiple_button)
+
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
 
@@ -257,8 +264,8 @@ class RecordEditor(wx.Frame):
                     pass
                 else:
                     pass
-                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nAllowed Characters:\n{}"
-                                                 .format(database_io.valid_chars),
+                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nDisallowed Characters:\n{}"
+                                                 .format(database_io.invalid_chars),
                                                  "Error", style=wx.ICON_ERROR)
                     error_dlg.ShowModal()
                     error_dlg.Destroy()
@@ -302,8 +309,8 @@ class RecordEditor(wx.Frame):
                 if valid is True:
                     pass
                 else:
-                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nAllowed Characters:\n{}"
-                                                 .format(database_io.valid_chars),
+                    error_dlg = wx.MessageDialog(self, "Entry contains invalid characters!\nDisallowed Characters:\n{}"
+                                                 .format(database_io.invalid_chars),
                                                  "Error", style=wx.ICON_ERROR)
                     error_dlg.ShowModal()
                     error_dlg.Destroy()
@@ -356,9 +363,10 @@ class RecordEditor(wx.Frame):
 
     def close_button_press(self, event):
         if self.unsaved_changes:
-            dlg = wx.MessageDialog(self, "Do you want to save changes to Record: {}\n"
+            dlg = wx.MessageDialog(self, "Do you want to save changes to record: {}\n"
                                          "\n"
-                                         "If not saved, any changes including linked files will not be stored in the archive."
+                                         "If not saved, any changes including newly linked "
+                                         "files will not be stored in the archive."
                                    .format(self.record.record_id, self.record.title),
                                    style=wx.YES_NO | wx.CANCEL | wx.CANCEL_DEFAULT
                                          | wx.ICON_INFORMATION, caption="Unsaved Changes")
@@ -444,14 +452,11 @@ class RecordEditor(wx.Frame):
                     break
 
         # Files
-        check_files = []
-        for i in range(self.file_list_box.GetCount()):
-            check_files.append(self.file_list_box.GetString(i))
-        if len(check_files) != len(self.record.linked_files):
+        if len(self.temp_files) != len(self.record.linked_files):
             self.unsaved_changes = True
             print("Files Changed - Len")
         else:
-            for f in check_files:
+            for f in self.temp_files:
                 if f not in self.record.linked_files:
                     self.unsaved_changes = True
                     print("Files changed - Different File")
@@ -463,7 +468,7 @@ class RecordEditor(wx.Frame):
             self.save_button.Disable()
 
     def file_link_selected(self, event=None):
-        path = self.record.linked_files[self.file_list_box.GetSelection()]
+        path = self.temp_files[self.file_list_box.GetSelection()]
         self.previewer_file_name_lbl.SetLabel(path)
         if os.path.exists(path):
             file_extension = path.split(".")[-1].upper()
@@ -481,18 +486,18 @@ class RecordEditor(wx.Frame):
     def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
         dlg.Show(True)
-        suc = self.record.launch_file(self.file_list_box.GetSelection())
+        suc = self.record.launch_file(file_path=self.temp_files[self.file_list_box.GetSelection()])
         if suc is True:
             dlg.Destroy()
             return None
         elif suc == "Index Error":
-            msg = "File '{}' does not appear to be linked to this record!"\
+            msg = "File '{}' does not appear to be linked to this record!" \
                 .format(self.record.linked_files[self.file_list_box.GetSelection()])
         elif suc == "Path Error":
-            msg = "File '{}' does not appear to exist!"\
+            msg = "File '{}' does not appear to exist!" \
                 .format(self.record.linked_files[self.file_list_box.GetSelection()])
         else:
-            msg = "File '{}' could not be opened for an unknown reason, which is worrying..."\
+            msg = "File '{}' could not be opened for an unknown reason, which is worrying..." \
                 .format(self.record.linked_files[self.file_list_box.GetSelection()])
         dlg.Destroy()
         dlg = wx.MessageDialog(self, msg, "File Error", wx.OK)
@@ -525,10 +530,6 @@ class RecordEditor(wx.Frame):
                                              self.end_date_picker.GetValue().month + 1,
                                              self.end_date_picker.GetValue().day)
 
-        new_linked_files = []
-        for i in range(self.file_list_box.GetCount()):
-            new_linked_files.append(self.file_list_box.GetString(i))
-
         new_record_obj = database_io.ArchiveRecord(record_id=self.record.record_id,
                                                    title=self.title_box.GetValue().strip(),
                                                    description=self.desc_box.GetValue().strip(),
@@ -538,7 +539,7 @@ class RecordEditor(wx.Frame):
                                                    end_date=new_end_date,
                                                    physical_ref=self.physical_ref_box.GetValue().strip(),
                                                    other_ref=self.other_ref_box.GetValue().strip(),
-                                                   linked_files=new_linked_files,
+                                                   linked_files=self.temp_files,
                                                    created_by=self.record.created_by,
                                                    created_time=self.record.created_time
                                                    )
@@ -557,8 +558,8 @@ class RecordEditor(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
         elif valid == "Bad Chars":
-            dlg = wx.MessageDialog(self, "Record contains invalid characters!\nAllowed Characters:\n{}"
-                                   .format(database_io.valid_chars),
+            dlg = wx.MessageDialog(self, "Record contains invalid characters!\nDisallowed Characters:\n{}"
+                                   .format(database_io.invalid_chars),
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
@@ -580,19 +581,75 @@ class RecordEditor(wx.Frame):
         self.physical_ref_box.ChangeValue(str(self.record.physical_ref))
         self.other_ref_box.ChangeValue(str(self.record.other_ref))
         self.tags_box.ChangeValue(self.record.string_tags())
-        self.file_list_box.Set(self.record.linked_files)
+        self.temp_files = []
+        display_files = []
+        for f in self.record.linked_files:
+            self.temp_files.append(f)
+            display_files.append(format_path_to_title(os.path.basename(f)))
+        self.file_list_box.Set(display_files)
         self.created_text.Label = "Created by:\n{} - {}".format(str(self.record.created_by),
                                                                 str(self.record.created_time_string()))
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
                                                                   str(self.record.last_changed_time_string()))
         self.set_changed()
 
-    def link_new_file(self):
-        a = 1
+        print("Linked Files:", self.record.linked_files)
+        print("Temp File:", self.temp_files)
+
+    def link_new_file(self, event=None, new_file_path=None):
+        """Links single file to the record."""
         # Select the file
-        #   Format it if needs be
+        if new_file_path is None:
+            file_open_dlg = wx.FileDialog(self, __title__ + " - Select File To Link",
+                                          style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+            resp = file_open_dlg.ShowModal()
+            if resp == wx.ID_CANCEL:
+                return None
+            else:
+                new_file_path = file_open_dlg.GetPath()
+        else:
+            pass
         # Copy it to the cache
-        #
+        if new_file_path.startswith(database_io.TEMP_DATA_LOCATION):
+            pass
+        else:
+            new_file_path = database_io.move_file_to_cache(new_file_path)
+        # Add the cached dir to the temp dir list
+        self.temp_files.append(new_file_path)
+        self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
+        self.set_changed()
+
+    def merge_and_link_multiple_files(self, event):
+        # Select the files
+        file_open_dlg = wx.FileDialog(self, __title__ + " - Select File To Link",
+                                      wildcard="Image files (*.jpg;*.jpeg,*.bmp)|*.jpg;*.jpeg;*.bmp|"
+                                               "PDF files (*.pdf)|*.pdf|"
+                                               "All files (*.*)|*.*",
+                                      style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE)
+        resp = file_open_dlg.ShowModal()
+        if resp == wx.ID_CANCEL:
+            return None
+        else:
+            file_paths = file_open_dlg.GetPaths()
+        # Get a name for the new file.
+        t = datetime.datetime.fromtimestamp(time.time())
+        new_file_name = "PDF Merge {}{}{}{}{}.pdf".format(str(t.year)[2:4],
+                                                          str(t.month).zfill(2),
+                                                          str(t.day).zfill(2),
+                                                          str(t.hour).zfill(2),
+                                                          str(t.minute).zfill(2))
+        new_file_path = os.path.join(database_io.TEMP_DATA_LOCATION, new_file_name)
+        loading_dlg = LoadingDialog(self)
+        loading_dlg.Show(True)
+        loading_dlg.loading_bar.Pulse()
+        suc = database_io.join_files(file_paths, new_file_path)
+        loading_dlg.Destroy()
+        if suc is False:
+            dlg = wx.MessageDialog(self, "Could not merge the files!", "Error")
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            self.link_new_file(new_file_path=new_file_path)
 
 
 class LoadingDialog(wx.lib.sized_controls.SizedDialog):
@@ -608,14 +665,22 @@ class LoadingDialog(wx.lib.sized_controls.SizedDialog):
         self.loading_bar.Pulse()
 
 
+def format_path_to_title(path):
+    n, e = path.rsplit(".", 1)
+    return "({}) {}".format(e.upper(), n)
+
+
 def main(record_obj):
     app = wx.App(False)
     frame = RecordEditor(None, __title__, record_obj)
     app.MainLoop()
+    database_io.clear_cache()
 
 
 if __name__ == "__main__":
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
-    r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg", r"C:\Users\louis\Desktop\test2.jpg"]
+    r.linked_files = [r"C:\Users\louis\Desktop\test1.jpg",
+                      r"C:\Users\louis\Desktop\test2.jpg",
+                      r"C:\Users\louis\Desktop\KT_Flyer2.pdf"]
     main(r)
