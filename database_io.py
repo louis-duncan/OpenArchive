@@ -13,7 +13,8 @@ import shutil
 __title__ = "OpenArchive"
 
 # noinspection SpellCheckingInspection
-valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?*# \n\t"
+valid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890!&()':-.,/?*# \n\t" \
+              ""
 
 # Define database location and test it's existence.
 DATABASE_LOCATION = "bin\\archive.db"

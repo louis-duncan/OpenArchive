@@ -120,10 +120,14 @@ class RecordEditor(wx.Frame):
         column_two = wx.GridBagSizer(vgap=10, hgap=10)
         file_list_lbl = wx.StaticText(bg_panel, label="Linked Files (Single click to Preview, Double click to open):")
         column_two.Add(file_list_lbl, (1, 1))
-        file_list = self.record.linked_files
-        if file_list is None:
-            file_list = []
-        self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=file_list)
+        display_file_list = []
+        if not self.record.linked_files:
+            pass
+        else:
+            for f in self.record.linked_files:
+                display_file_list.append(os.path.basename(f))
+        self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=display_file_list,
+                                        style=wx.LB_HSCROLL)
         column_two.Add(self.file_list_box, (2, 1))
 
         # File Buttons
@@ -180,8 +184,14 @@ class RecordEditor(wx.Frame):
                                    style=wx.HSCROLL | wx.VSCROLL | wx.SUNKEN_BORDER)
         column_three.Add(self.previewer, (2, 1))
 
+        # Previewed file name.
+        self.previewer_file_name_lbl = wx.StaticText(bg_panel, label="#############################################",
+                                                     style=wx.ST_NO_AUTORESIZE | wx.ST_ELLIPSIZE_START)
+        self.previewer_file_name_lbl.SetLabel("")
+        column_three.Add(self.previewer_file_name_lbl, (3, 1))
+
         # Add a spacer to the sizer
-        column_three.Add((10, 10), pos=(3, 2))
+        column_three.Add((15, 20), pos=(3, 2))
 
         sizer.Add(column_one, 0, wx.EXPAND, 0)
         sizer.Add(column_two, 0, wx.EXPAND, 0)
@@ -453,7 +463,8 @@ class RecordEditor(wx.Frame):
             self.save_button.Disable()
 
     def file_link_selected(self, event=None):
-        path = self.file_list_box.GetString(self.file_list_box.GetSelection())
+        path = self.record.linked_files[self.file_list_box.GetSelection()]
+        self.previewer_file_name_lbl.SetLabel(path)
         if os.path.exists(path):
             file_extension = path.split(".")[-1].upper()
             if file_extension in ("PDF", "JPG", "JPEG", "BMP", "PNG"):
@@ -470,16 +481,19 @@ class RecordEditor(wx.Frame):
     def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
         dlg.Show(True)
-        suc = self.record.launch_file(self.record.linked_files.index(event.GetString()))
+        suc = self.record.launch_file(self.file_list_box.GetSelection())
         if suc is True:
             dlg.Destroy()
             return None
         elif suc == "Index Error":
-            msg = "File {} does not appear to be linked to this record!".format(event.GetString())
+            msg = "File '{}' does not appear to be linked to this record!"\
+                .format(self.record.linked_files[self.file_list_box.GetSelection()])
         elif suc == "Path Error":
-            msg = "File {} does not appear to exist!".format(event.GetString())
+            msg = "File '{}' does not appear to exist!"\
+                .format(self.record.linked_files[self.file_list_box.GetSelection()])
         else:
-            msg = "File {} could not be opened for an unknown reason, which is worrying...".format(event.GetString())
+            msg = "File '{}' could not be opened for an unknown reason, which is worrying..."\
+                .format(self.record.linked_files[self.file_list_box.GetSelection()])
         dlg.Destroy()
         dlg = wx.MessageDialog(self, msg, "File Error", wx.OK)
         dlg.ShowModal()
@@ -572,6 +586,13 @@ class RecordEditor(wx.Frame):
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
                                                                   str(self.record.last_changed_time_string()))
         self.set_changed()
+
+    def link_new_file(self):
+        a = 1
+        # Select the file
+        #   Format it if needs be
+        # Copy it to the cache
+        #
 
 
 class LoadingDialog(wx.lib.sized_controls.SizedDialog):
