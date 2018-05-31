@@ -659,12 +659,12 @@ def check_record(record_obj: ArchiveRecord):
 
 
 def add_new_type(type_string):
-    bliss.run("INSERT INTO types (type_text) values (?)", (type_string,))
+    bliss.run("INSERT INTO types (type_text) VALUES (?)", (type_string,))
     conn.commit()
 
 
 def add_new_local_authority(local_auth_string):
-    bliss.run("INSERT INTO local_authorities (local_auth) values (?)", (local_auth_string,))
+    bliss.run("INSERT INTO local_authorities (local_auth) VALUES (?)", (local_auth_string,))
     conn.commit()
 
 
@@ -672,17 +672,10 @@ def move_file_to_cache(new_file_path):
     return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
 
 
-def join_files(file_paths=None, output_path=None):
-    if file_paths is None:
-        return None
-    else:
-        if output_path is None:
-            fd, output_path = temp.mkstemp(suffix=".pdf", prefix="OATEMP", dir=database_io.TEMP_DATA_LOCATION)
-            os.close(fd)
-        else:
-            pass
-        err = im2pdf.union(file_paths, output_path)
-        if err:
-            return False
-        else:
-            return output_path
+def add_bookmark(record_id):
+    check = bliss.one("SELECT title FROM resources WHERE id=?", (record_id,))
+    assert check is not None
+    user_name = os.environ["USERNAME"]
+    print("Bookmarking {} for {}".format(check, user_name))
+    bliss.run("INSERT INTO bookmarks (user_name, record_id) VALUES (?, ?)", (user_name, record_id))
+    conn.commit()

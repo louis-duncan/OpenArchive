@@ -367,7 +367,10 @@ class RecordEditor(wx.Frame):
 
     # Todo: Add File Removing
 
-    # Todo: Add adding My List.
+    def add_bookmark(self, event):
+        assert str(self.record.record_id) not in ("New Record", "0")
+
+        database_io.add_bookmark(self.record.record_id)
 
     def close_button_press(self, event):
         if self.unsaved_changes:
