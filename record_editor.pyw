@@ -27,11 +27,10 @@ class RecordEditor(wx.Frame):
 
         self.record = record_to_edit
 
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
         column_one = wx.GridBagSizer(vgap=10, hgap=10)
 
         # Add bg panel
-        bg_panel = wx.Panel(self, size=(1500, 500))
+        bg_panel = wx.Panel(self, size=(2000, 2000))
 
         # Add Record ID
         id_lbl = wx.StaticText(bg_panel, label="Record ID:")
@@ -197,7 +196,8 @@ class RecordEditor(wx.Frame):
         column_three.Add(previewer_lbl, (1, 1))
         self.previewer = pdfViewer(bg_panel, wx.NewId(), wx.DefaultPosition, (315, 315),
                                    style=wx.HSCROLL | wx.VSCROLL | wx.SUNKEN_BORDER)
-        column_three.Add(self.previewer, (2, 1))
+        self.previewer.ShowLoadProgress = True
+        column_three.Add(self.previewer, (2, 1), flag=wx.EXPAND)
 
         # Previewed file name.
         self.previewer_file_name_lbl = wx.StaticText(bg_panel, label="#############################################",
@@ -208,11 +208,19 @@ class RecordEditor(wx.Frame):
         # Add a spacer to the sizer
         column_three.Add((15, 20), pos=(3, 2))
 
-        sizer.Add(column_one, 0, wx.EXPAND, 0)
-        sizer.Add(column_two, 0, wx.EXPAND, 0)
-        sizer.Add(column_three, 0, wx.EXPAND, 0)
+        # Normal View
+        normal_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        normal_sizer.Add(column_one, 0, wx.EXPAND, 0)
+        normal_sizer.Add(column_two, 0, wx.EXPAND, 0)
+        normal_sizer.Add(column_three, 0, wx.EXPAND, 0)
 
-        self.SetSizerAndFit(sizer)
+        # Expanded Preview
+        # expanded_preview_sizer = wx.GridBagSizer(10, 10)
+        # expanded_preview_sizer.Add(column_one, (0, 0))
+        # expanded_preview_sizer.Add(column_two, (1, 0))
+        # expanded_preview_sizer.Add(column_three, (0, 1), span=(2, 1))
+
+        self.SetSizerAndFit(normal_sizer)
 
         self.create_binds()
 
