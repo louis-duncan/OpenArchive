@@ -164,6 +164,10 @@ class RecordEditor(wx.Frame):
 
         self.add_to_list_button = wx.Button(bg_panel, size=(100, 35), label="Add To My List")
         main_buttons_sizer.Add(self.add_to_list_button)
+        if self.record.record_id in ("New Record", "0", 0):
+            self.add_to_list_button.Disable()
+        else:
+            pass
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
@@ -238,6 +242,9 @@ class RecordEditor(wx.Frame):
 
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
+
+        # My List button.
+        self.Bind(wx.EVT_BUTTON, self.add_bookmark, self.add_to_list_button)
 
         # Close Button > Close Frame
         self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
@@ -369,8 +376,8 @@ class RecordEditor(wx.Frame):
 
     def add_bookmark(self, event):
         assert str(self.record.record_id) not in ("New Record", "0")
-
         database_io.add_bookmark(self.record.record_id)
+        self.refresh_all()
 
     def close_button_press(self, event):
         if self.unsaved_changes:
@@ -605,8 +612,14 @@ class RecordEditor(wx.Frame):
                                                                   str(self.record.last_changed_time_string()))
         self.set_changed()
 
-        print("Linked Files:", self.record.linked_files)
-        print("Temp File:", self.temp_files)
+        self.add_to_list_button.Disable()
+        if self.record.record_id in ("New Record", "0", 0):
+            pass
+        else:
+            if self.record.record_id in database_io.get_user_bookmarks():
+                pass
+            else:
+                self.add_to_list_button.Enable()
 
     def link_new_file(self, event=None, new_file_path=None):
         """Links single file to the record."""
@@ -666,7 +679,7 @@ class RecordEditor(wx.Frame):
 
         loading_dlg = wx.ProgressDialog("Merge Files", "Merging files...", len(file_paths))
         loading_dlg.ShowModal()
-
+        suc = True
         try:
             output = PdfFileWriter()
             part_files_handles = []  # [fh, created=True/False]
@@ -704,7 +717,6 @@ class RecordEditor(wx.Frame):
                 f[0].close()  # Close each file.
                 if f[1]:
                     os.remove(part_path)  # If 'created' flag is True, remove file a it was created in this process.
-                suc = True
         except:
             suc = False
 
