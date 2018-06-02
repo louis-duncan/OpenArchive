@@ -125,13 +125,13 @@ class RecordEditor(wx.Frame):
         column_two = wx.GridBagSizer(vgap=10, hgap=10)
         file_list_lbl = wx.StaticText(bg_panel, label="Linked Files (Single click to Preview, Double click to open):")
         column_two.Add(file_list_lbl, (1, 1))
-        self.temp_files = []
+        self.temp_file_links = []
         self.display_file_list = []
         if not self.record.linked_files:
             pass
         else:
             for f in self.record.linked_files:
-                self.temp_files.append(f)
+                self.temp_file_links.append(f)
                 self.display_file_list.append(format_path_to_title(os.path.basename(f)))
         self.file_list_box = wx.ListBox(bg_panel, size=(320, 120), choices=self.display_file_list,
                                         style=wx.LB_HSCROLL)
@@ -146,6 +146,10 @@ class RecordEditor(wx.Frame):
         file_buttons_sizer.Add(self.upload_multiple_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
+        if len(self.record.linked_files) == 0:
+            self.remove_file_button.Disable()
+        else:
+            pass
         file_buttons_sizer.Add(self.remove_file_button)
 
         column_two.Add(file_buttons_sizer, (3, 1), flag=wx.EXPAND)
@@ -247,6 +251,7 @@ class RecordEditor(wx.Frame):
         # File Management Buttons
         self.Bind(wx.EVT_BUTTON, self.link_new_file, self.upload_single_button)
         self.Bind(wx.EVT_BUTTON, self.merge_and_link_multiple_files, self.upload_multiple_button)
+        self.Bind(wx.EVT_BUTTON, self.unlink_file, self.remove_file_button)
 
         # Save Button > Save Record
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
@@ -380,7 +385,14 @@ class RecordEditor(wx.Frame):
             pass
         self.set_changed()
 
-    # Todo: Add File Removing
+    def unlink_file(self, event):
+        file_to_remove = self.temp_file_links[self.file_list_box.GetSelection()]
+        # Get all links to the file.
+        links = database_io.get_files_links(file_path)
+        # If this is the only link
+        #  Raise message, and if continued, create copy, unlink, and remove from repo
+        # If not only link, remove link.
+        # Todo: Finish file removing.
 
     def add_bookmark(self, event):
         assert str(self.record.record_id) not in ("New Record", "0")
@@ -478,11 +490,11 @@ class RecordEditor(wx.Frame):
                     break
 
         # Files
-        if len(self.temp_files) != len(self.record.linked_files):
+        if len(self.temp_file_links) != len(self.record.linked_files):
             self.unsaved_changes = True
             print("Files Changed - Len")
         else:
-            for f in self.temp_files:
+            for f in self.temp_file_links:
                 if f not in self.record.linked_files:
                     self.unsaved_changes = True
                     print("Files changed - Different File")
@@ -493,8 +505,14 @@ class RecordEditor(wx.Frame):
         else:
             self.save_button.Disable()
 
+        self.remove_file_button.Disable()
+        if len(self.temp_file_links) > 0:
+            self.remove_file_button.Enable()
+        else:
+            pass
+
     def file_link_selected(self, event=None):
-        path = self.temp_files[self.file_list_box.GetSelection()]
+        path = self.temp_file_links[self.file_list_box.GetSelection()]
         self.previewer_file_name_lbl.SetLabel(path)
         if os.path.exists(path):
             file_extension = path.split(".")[-1].upper()
@@ -512,7 +530,7 @@ class RecordEditor(wx.Frame):
     def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
         dlg.Show(True)
-        suc = self.record.launch_file(file_path=self.temp_files[self.file_list_box.GetSelection()])
+        suc = self.record.launch_file(file_path=self.temp_file_links[self.file_list_box.GetSelection()])
         if suc is True:
             dlg.Destroy()
             return None
@@ -566,7 +584,7 @@ class RecordEditor(wx.Frame):
                                                    end_date=new_end_date,
                                                    physical_ref=self.physical_ref_box.GetValue().strip(),
                                                    other_ref=self.other_ref_box.GetValue().strip(),
-                                                   linked_files=self.temp_files,
+                                                   linked_files=self.temp_file_links,
                                                    created_by=self.record.created_by,
                                                    created_time=self.record.created_time
                                                    )
@@ -608,17 +626,16 @@ class RecordEditor(wx.Frame):
         self.physical_ref_box.ChangeValue(str(self.record.physical_ref))
         self.other_ref_box.ChangeValue(str(self.record.other_ref))
         self.tags_box.ChangeValue(self.record.string_tags())
-        self.temp_files = []
+        self.temp_file_links = []
         display_files = []
         for f in self.record.linked_files:
-            self.temp_files.append(f)
+            self.temp_file_links.append(f)
             display_files.append(format_path_to_title(os.path.basename(f)))
         self.file_list_box.Set(display_files)
         self.created_text.Label = "Created by:\n{} - {}".format(str(self.record.created_by),
                                                                 str(self.record.created_time_string()))
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
                                                                   str(self.record.last_changed_time_string()))
-        self.set_changed()
 
         self.add_to_list_button.Disable()
         if self.record.record_id in ("New Record", "0", 0):
@@ -628,6 +645,8 @@ class RecordEditor(wx.Frame):
                 pass
             else:
                 self.add_to_list_button.Enable()
+
+        self.set_changed()
 
     def link_new_file(self, event=None, new_file_path=None):
         """Links single file to the record."""
@@ -643,14 +662,14 @@ class RecordEditor(wx.Frame):
         else:
             pass
         # Copy it to the cache
-        if new_file_path.startswith(database_io.TEMP_DATA_LOCATION):
+        if new_file_path.startswith(database_io.ARCHIVE_LOCATION):
             pass
         else:
             new_file_path = database_io.move_file_to_cache(new_file_path)
         # Add the cached dir to the temp dir list
-        self.temp_files.append(new_file_path)
+        self.temp_file_links.append(new_file_path)
         self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
-        self.file_list_box.SetSelection(len(self.temp_files) - 1)
+        self.file_list_box.SetSelection(len(self.temp_file_links) - 1)
         self.file_link_selected()
         self.set_changed()
 

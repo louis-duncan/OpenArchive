@@ -16,11 +16,12 @@ __title__ = "OpenArchive"
 # noinspection SpellCheckingInspection
 invalid_chars = ""
 
-# Define database location and test it's existence.
-DATABASE_LOCATION = ".\\new\\new.db"
-ARCHIVE_LOCATION = ".\\new\\repo"  # os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
-TEMP_DATA_LOCATION = ".\\new\\temp"  # os.path.join(os.environ["TEMP"], "OpenArchive")
+# Define database locations.
+DATABASE_LOCATION = os.path.abspath(".\\new\\new.db")
+ARCHIVE_LOCATION = os.path.abspath(".\\new\\repo")  # os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
+TEMP_DATA_LOCATION = os.path.abspath(".\\new\\temp")  # os.path.join(os.environ["TEMP"], "OpenArchive")
 EPOCH = datetime.datetime(1970, 1, 1)
+
 
 class ArchiveRecord:
     record_id = None
@@ -587,8 +588,8 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                                                         (changed_time_stamp,)))
         bliss.run("DELETE FROM file_links WHERE record_id=?", (record_obj.record_id,))
         for f in files_to_link:
-            link_f = f
-            if link_f.startswith(ARCHIVE_LOCATION): # If file in archive, re-link.
+            link_f = os.path.abspath(f)
+            if link_f.startswith(os.path.abspath(ARCHIVE_LOCATION)): # If file in archive, re-link.
                 pass
             else: # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
@@ -624,7 +625,7 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
 
 def move_file_to_archive(cached_path=""):
     new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION)
-    new_full_path = os.path.join(new_root, os.path.basename(cached_path))
+    new_full_path = os.path.abspath(os.path.join(new_root, os.path.basename(cached_path)))
     return shutil.copy2(cached_path, new_full_path)
 
 
@@ -731,6 +732,10 @@ def get_user_bookmarks(user_name=None):
         pass
     results = bliss.all("SELECT record_id FROM bookmarks WHERE user_name=?", (user_name,))
     return results
+
+
+def get_files_links(file_path):
+    return bliss.all("SELECT * FROM main.file_links WHERE file_path=?", (file_path,))
 
 
 try:
