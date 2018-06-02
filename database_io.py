@@ -17,30 +17,10 @@ __title__ = "OpenArchive"
 invalid_chars = ""
 
 # Define database location and test it's existence.
-DATABASE_LOCATION = "bin\\archive.db"
-ARCHIVE_LOCATION = os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
-TEMP_DATA_LOCATION = os.path.join(os.environ["TEMP"], "OpenArchive")
+DATABASE_LOCATION = ".\\new\\new.db"
+ARCHIVE_LOCATION = ".\\new\\repo"  # os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
+TEMP_DATA_LOCATION = ".\\new\\temp"  # os.path.join(os.environ["TEMP"], "OpenArchive")
 EPOCH = datetime.datetime(1970, 1, 1)
-
-if os.path.exists(DATABASE_LOCATION):
-    conn = sqlite3.connect(DATABASE_LOCATION)
-    bliss = sql.SQL(conn)
-    # A test to see if tables 'resources', 'resource_types', and 'local_authorities' should go here.
-    # But I haven't worked out the best way to check yet.
-else:
-    easygui.msgbox("The database could not be located.\n{}\n\nThe program will now exit."
-                   .format(DATABASE_LOCATION))
-    exit()
-if os.path.exists(ARCHIVE_LOCATION):
-    pass
-else:
-    easygui.msgbox("The data repository could not be located.\n{}\n\nThe program will now exit."
-                   .format(ARCHIVE_LOCATION))
-if os.path.exists(TEMP_DATA_LOCATION):
-    pass
-else:
-    os.mkdir(TEMP_DATA_LOCATION)
-
 
 class ArchiveRecord:
     record_id = None
@@ -218,6 +198,69 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
                 else:
                     tags.append(p.upper())
             return tags
+
+
+def create_new_database():
+    try:
+        os.mkdir(os.path.abspath(os.path.dirname(DATABASE_LOCATION)))
+    except FileExistsError:
+        print("Directory already there.")
+    new_conn = sqlite3.connect(DATABASE_LOCATION)
+    new_bliss = sql.SQL(new_conn)
+    queries = ["""CREATE TABLE resources
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    title VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    record_type INTEGER NOT NULL,
+    local_auth INTEGER NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    tags VARCHAR,
+    other_ref VARCHAR,
+    physical_ref VARCHAR,
+    created_by VARCHAR,
+    created_time DATETIME,
+    last_changed_by VARCHAR,
+    last_changed_time DATETIME
+)""",
+               "CREATE UNIQUE INDEX resources_id_uindex ON resources(id)",
+               """CREATE TABLE types
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    type_text VARCHAR NOT NULL
+)""",
+               "CREATE UNIQUE INDEX types_id_uindex ON types(id)",
+               "CREATE UNIQUE INDEX types_type_text_uindex ON types (type_text)",
+               """CREATE TABLE local_authorities
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    local_auth VARCHAR NOT NULL
+)""",
+               "CREATE UNIQUE INDEX local_authorities_id_uindex ON local_authorities (id)",
+               "CREATE UNIQUE INDEX local_authorities_local_auth_uindex ON local_authorities (local_auth)",
+               """CREATE TABLE file_links
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    record_id INTEGER NOT NULL,
+    file_path VARCHAR NOT NULL,
+    thumbnail_path VARCHAR
+)""",
+               "CREATE UNIQUE INDEX file_links_id_uindex ON file_links (id)",
+               """CREATE TABLE bookmarks
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_name VARCHAR NOT NULL,
+    record_id INTEGER NOT NULL
+)""",
+               "CREATE UNIQUE INDEX bookmarks_id_uindex ON bookmarks (id)",
+               "INSERT INTO types(id, type_text) VALUES(0, 'None')",
+               "INSERT INTO local_authorities(id, local_auth) VALUES(0, 'None')",
+               ]
+    for q in queries:
+        new_bliss.run(q, ())
+    new_conn.commit()
+    new_conn.close()
 
 
 def access_bin_file(filename):
@@ -688,3 +731,42 @@ def get_user_bookmarks(user_name=None):
         pass
     results = bliss.all("SELECT record_id FROM bookmarks WHERE user_name=?", (user_name,))
     return results
+
+
+try:
+    if os.path.exists(DATABASE_LOCATION):
+        pass
+    else:
+        easygui.msgbox("Could load the database at '{}'\n"
+                       "\n"
+                       "OpenArchive will attempt to start a new database.".format(DATABASE_LOCATION))
+        create_new_database()
+    conn = sqlite3.connect(DATABASE_LOCATION)
+    bliss = sql.SQL(conn)
+except sqlite3.OperationalError:
+    easygui.msgbox("Could load the database at '{}'\n"
+                   "\n"
+                   "The path may not be valid.".format(DATABASE_LOCATION))
+    exit()
+
+if os.path.exists(ARCHIVE_LOCATION):
+    pass
+else:
+    try:
+        os.mkdir(ARCHIVE_LOCATION)
+    except:
+        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
+                       "{}\n"
+                       "\n"
+                       "The program will now exit.".format(ARCHIVE_LOCATION))
+
+if os.path.exists(TEMP_DATA_LOCATION):
+    pass
+else:
+    try:
+        os.mkdir(TEMP_DATA_LOCATION)
+    except:
+        easygui.msgbox("OpenArchive could not access or create the temporary data location at:\n"
+                       "{}\n"
+                       "\n"
+                       "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)

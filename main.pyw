@@ -70,5 +70,6 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIV
 if __name__ == "__main__":
     main_menu()
     database_io.clear_cache()
+    database_io.conn.close()
 else:
     pass
