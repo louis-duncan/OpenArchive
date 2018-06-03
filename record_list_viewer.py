@@ -11,6 +11,8 @@ from database_io import ArchiveRecord
 
 __title__ = "OpenArchive"
 
+test_data = None
+
 
 class DataModel(dv.DataViewIndexListModel):
     def __init__(self, data):
@@ -86,6 +88,7 @@ class RecordListViewer(wx.Frame):
                                    | dv.DV_VERT_RULES
                                    | dv.DV_VARIABLE_LINE_HEIGHT
                                    )
+        self.Bind(wx.dataview.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
 
         self.data = []
         for r in record_ids:
@@ -112,7 +115,8 @@ class RecordListViewer(wx.Frame):
         for i, (h, w) in enumerate(headings):
             self.dvc.AppendTextColumn(h, i, width=w)
 
-        self.dvc.AssociateModel(DataModel(self.data))
+        model = DataModel(self.data)
+        self.dvc.AssociateModel(model)
 
         self.export_button = wx.Button(self, -1, "Export to '.csv'")
         self.Bind(wx.EVT_BUTTON, self.export_csv, self.export_button)
@@ -126,6 +130,12 @@ class RecordListViewer(wx.Frame):
         self.SetSizer(sizer)
 
         self.Show()
+
+    def record_activated(self, event):
+        selections = self.dvc.GetSelections()
+        #print(selections[0].GetData())
+        # Todo: Fix this!
+        pass
 
     def export_csv(self, e, dest=None):
         if dest is None:
