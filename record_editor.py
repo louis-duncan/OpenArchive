@@ -165,10 +165,6 @@ class RecordEditor(wx.Frame):
 
         self.add_to_list_button = wx.Button(bg_panel, size=(100, 35), label="Add To My List")
         main_buttons_sizer.Add(self.add_to_list_button)
-        if self.record.record_id in ("New Record", "0", 0):
-            self.add_to_list_button.Disable()
-        else:
-            pass
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
@@ -229,6 +225,7 @@ class RecordEditor(wx.Frame):
         self.Show(True)
 
         self.unsaved_changes = False
+        self.refresh_all()
 
     def create_binds(self):
         # Bind Data Entry
@@ -259,6 +256,7 @@ class RecordEditor(wx.Frame):
 
         # Close Button > Close Frame
         self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
+        self.Bind(wx.EVT_CLOSE, self.close_button_press)
 
     def update_title(self, event):
         self.set_changed()
@@ -451,7 +449,7 @@ class RecordEditor(wx.Frame):
                 return None
         else:
             pass
-        self.Close()
+        self.Destroy()
 
     def set_changed(self, event=None):
         self.unsaved_changes = False
@@ -669,11 +667,12 @@ class RecordEditor(wx.Frame):
                                                                   str(self.record.last_changed_time_string()))
 
         self.add_to_list_button.Disable()
+        self.add_to_list_button.Label = "Add To My List"
         if self.record.record_id in ("New Record", "0", 0):
             pass
         else:
             if self.record.record_id in database_io.get_user_bookmarks():
-                pass
+                self.add_to_list_button.Label = "In Your List"
             else:
                 self.add_to_list_button.Enable()
 
@@ -819,5 +818,5 @@ def main(record_obj):
 if __name__ == "__main__":
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
-    #r = database_io.get_record_by_id(9)
+    r = database_io.get_record_by_id(104)
     main(r)

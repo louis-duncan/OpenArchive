@@ -1,6 +1,8 @@
 import os
 import datetime
 import easygui
+
+import record_list_viewer
 import database_io
 import upload_agent
 import record_editor
@@ -31,17 +33,20 @@ def detailed_search():
 
 
 def launch_upload_agent():
-    # Launch upload agent
-    upload_agent.main_menu()
+    # Created Blank Record and loads editor.
+    r = database_io.ArchiveRecord()
+    r.record_id = "New Record"
+    # r = database_io.get_record_by_id(50)
+    record_editor.main(r)
 
 
 def access_users_list():
-    pass
     # Write access to users list
+    record_list_viewer.main()
 
 
 def main_menu():
-    choices = ["Quick\n   Search   ", "Detailed\n   Search   ", "   Upload   \nFiles", "My\n     List     ", "test"]
+    choices = ["Quick\n   Search   ", "Detailed\n   Search   ", "   New   \nRecord", "My\n     List     "]
     msg = """- Welcome to OpenArchive -
     
 Database File: {}
@@ -58,11 +63,6 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIV
             launch_upload_agent()
         elif choice == choices[3]:
             access_users_list()
-        elif choice == choices[4]:
-            #r = database_io.get_record_by_id(50)
-            r = database_io.ArchiveRecord()
-            r.record_id = "New Record"
-            record_editor.main(r)
         else:
             pass
 

@@ -764,6 +764,11 @@ def add_bookmark(record_id):
     conn.commit()
 
 
+def remove_bookmark(user_name, record_id):
+    bliss.run("DELETE FROM bookmarks WHERE user_name=? AND record_id=?", (user_name, record_id))
+    conn.commit()
+
+
 def get_user_bookmarks(user_name=None):
     if user_name is None:
         user_name = os.environ["USERNAME"]
