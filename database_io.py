@@ -586,7 +586,21 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))
-        bliss.run("DELETE FROM file_links WHERE record_id=?", (record_obj.record_id,))
+        old_file_links = bliss.all("SELECT * FROM main.file_links WHERE record_id=?", (record_obj.record_id,))
+
+        # Compare list of old links to the newly submitted links
+        # If the old link is not in the new list, mark as dead.
+        # If is is, remove that file name from the list.
+        dead_links = []
+        for link in old_file_links:
+            if link.file_path in files_to_link:
+                print(link.file_path, "already linked.")
+                dead_links.append(False)
+                files_to_link.remove(link.file_path)
+            else:
+                dead_links.append(True)
+
+        # The remaining files in the submitted list are new links, so deal with them.
         for f in files_to_link:
             link_f = os.path.abspath(f)
             if link_f.startswith(os.path.abspath(ARCHIVE_LOCATION)): # If file in archive, re-link.
@@ -595,6 +609,31 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                 link_f = move_file_to_archive(f)
             bliss.run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
                       (record_obj.record_id, link_f, ""))
+
+        # Now clear away dead links.
+        for i, link in enumerate(old_file_links):
+            if dead_links[i] is True:
+                # Check is truly dead
+                hope = bliss.all("SELECT * FROM file_links WHERE file_path=?", (link.file_path,))
+                if len(hope) <= 1:
+                    # No hope for this link!
+                    print("Purging {}!".format(link.file_path))
+                    desktop = os.path.join(os.environ["USERPROFILE"], "Desktop")
+                    shutil.copy2(link.file_path, desktop)
+                    try:
+                        os.remove(link.file_path)
+                        os.rmdir(os.path.dirname(link.file_path))
+                    except PermissionError:
+                        print("PermissionError: Could not delete {}!".format(link.file_path))
+                    except OSError:
+                        print("OSError: Could not delete {}!".format(os.path.dirname(link.file_path)))
+                    bliss.run("DELETE FROM file_links WHERE id=?", (link.id,))
+                else:
+                    # Just enough hope, so the record stays.
+                    pass
+            else:
+                pass
+
         conn.commit()
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))

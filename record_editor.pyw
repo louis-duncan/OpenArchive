@@ -8,6 +8,7 @@ from wx.lib.pdfviewer import pdfViewer
 import os
 import database_io
 import textdistance
+import shutil
 
 import PIL
 import PIL.Image
@@ -146,10 +147,7 @@ class RecordEditor(wx.Frame):
         file_buttons_sizer.Add(self.upload_multiple_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
-        if len(self.record.linked_files) == 0:
-            self.remove_file_button.Disable()
-        else:
-            pass
+        self.remove_file_button.Disable()
         file_buttons_sizer.Add(self.remove_file_button)
 
         column_two.Add(file_buttons_sizer, (3, 1), flag=wx.EXPAND)
@@ -386,13 +384,43 @@ class RecordEditor(wx.Frame):
         self.set_changed()
 
     def unlink_file(self, event):
+        # Drop out if no file is selected.
+        selection = self.file_list_box.GetSelection()
+
+        if selection == -1:
+            return None
+        else:
+            pass
         file_to_remove = self.temp_file_links[self.file_list_box.GetSelection()]
+        print(str(self.file_list_box.GetSelection()))
+        print(str(file_to_remove))
         # Get all links to the file.
-        links = database_io.get_files_links(file_path)
-        # If this is the only link
-        #  Raise message, and if continued, create copy, unlink, and remove from repo
-        # If not only link, remove link.
-        # Todo: Finish file removing.
+        links = database_io.get_files_links(file_to_remove)
+        if (len(links) == 1) and links[0].record_id != self.record.record_id:
+            # This allows the process to continue is there is only one link, but that link is from a different record.
+            pass
+        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION)):
+            #  Raise message, and if continued, create copy, unlink, and remove from repo
+            dlg = wx.MessageDialog(self, "Are you sure you want to unlink this file?\n"
+                                         "\n"
+                                         "This is the only record which links to this file in the archive.\n"
+                                         "If you choose to to unlink the file, it will be copied to your desktop\n"
+                                         "to prevent it being lost.",
+                                   style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
+            resp = dlg.ShowModal()
+            if resp == wx.ID_NO:
+                print("Pressed No")
+                return None
+            else:
+                pass
+        else:
+            pass
+
+        # remove link.
+        print("Removing {}!".format(file_to_remove))
+        self.temp_file_links.remove(file_to_remove)
+        self.file_list_box.Delete(self.file_list_box.GetSelection())
+        self.set_changed()
 
     def add_bookmark(self, event):
         assert str(self.record.record_id) not in ("New Record", "0")
@@ -526,6 +554,7 @@ class RecordEditor(wx.Frame):
                 self.previewer.LoadFile(no_preview_file)
         else:
             self.previewer.LoadFile(no_locate_file)
+        self.remove_file_button.Enable()
 
     def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
@@ -552,8 +581,10 @@ class RecordEditor(wx.Frame):
         if (self.record.record_id == "New Record") or (self.record.record_id == 0):
             pass
         else:
-            dlg = wx.MessageDialog(self, "Are you sure you want to save changes?\n\nSaving will permanently update "
-                                         "the record with the newly entered data.", "Confirm Save",
+            dlg = wx.MessageDialog(self, "Are you sure you want to save changes?\n"
+                                         "\n"
+                                         "Saving will permanently update the record with the newly entered data.\n"
+                                         "Linked files will be uploaded, and unlinked files will be purged.", "Confirm Save",
                                    style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
             resp = dlg.ShowModal()
             dlg.Destroy()
@@ -783,6 +814,7 @@ def main(record_obj):
 
 
 if __name__ == "__main__":
-    r = database_io.ArchiveRecord()
-    r.record_id = "New Record"
+    #r = database_io.ArchiveRecord()
+    #r.record_id = "New Record"
+    r = database_io.get_record_by_id(9)
     main(r)
