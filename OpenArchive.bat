@@ -1,1 +1,1 @@
-start venv\Scripts\pythonw.exe record_editor.py
+start venv\Scripts\pythonw.exe main.pyw

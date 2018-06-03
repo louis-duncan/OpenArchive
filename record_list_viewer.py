@@ -60,12 +60,24 @@ class RecordListViewer(wx.Frame):
                     ("Local Auth:", 120),
                     ("Date Period:", 150),
                     )
+
         total_width = 0
         for h in headings:
             total_width += h[1]
 
-        wx.Frame.__init__(self, parent, title=__title__ + " - " + title,
+        wx.Frame.__init__(self, parent, title=title,
                           size=(total_width + 20, 500), style=wx.DEFAULT_FRAME_STYLE)
+
+        if len(record_ids) == 0:
+            dlg = wx.MessageDialog(self, "No Records\n"
+                                         "\n"
+                                         "No records to show.",
+                                   title)
+            dlg.ShowModal()
+            dlg.Destroy()
+            self.Destroy()
+        else:
+            pass
 
         # Create List Control
         self.dvc = dv.DataViewCtrl(self,
@@ -81,21 +93,20 @@ class RecordListViewer(wx.Frame):
             record: ArchiveRecord = database_io.get_record_by_id(r)
 
             # Todo: Add catch for none records. Including removing dead bookmarks.
-            if record is None:
-                database_io.remove_bookmark(user_name, record)
-            else:
-                dates = ()
-                # Todo: Finish data formatting.
-                date_range_string = ""
-                entry = (record.record_id,
-                         record.title,
-                         record.description.replace("\n", " "),
-                         record.record_type,
-                         record.local_auth,
-                         date_range_string,
-                         record.string_tags()
-                         )
-                self.data.append(entry)
+            assert record is not None
+
+            dates = ()
+            # Todo: Finish data formatting.
+            date_range_string = ""
+            entry = (record.record_id,
+                     record.title,
+                     record.description.replace("\n", " "),
+                     record.record_type,
+                     record.local_auth,
+                     date_range_string,
+                     record.string_tags()
+                     )
+            self.data.append(entry)
 
         # Add columns
         for i, (h, w) in enumerate(headings):
@@ -115,6 +126,7 @@ class RecordListViewer(wx.Frame):
         self.SetSizer(sizer)
 
         self.Show()
+
 
     def export_csv(self, e, dest=None):
         if dest is None:
@@ -156,4 +168,4 @@ if __name__ == '__main__':
                 easygui.msgbox("No bookmarks for user '{}'".format(user_name),
                                __title__ + " - User Bookmarks")
             else:
-                main("Bookmark Viewer", bookmarks)
+                main(__title__ + " - Bookmark Viewer - " + user_name, bookmarks)

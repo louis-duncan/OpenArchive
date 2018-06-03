@@ -41,8 +41,20 @@ def launch_upload_agent():
 
 
 def access_users_list():
-    # Write access to users list
-    record_list_viewer.main()
+    # Access to users list
+    user_name = os.environ["USERNAME"]
+    bookmarks = database_io.get_user_bookmarks(user_name)
+    # Check bookmarks for dead links
+    dead_bookmarks = []
+    for b in bookmarks:
+        test = database_io.get_record_by_id(b)
+        if test is None:
+            database_io.remove_bookmark(user_name, b)
+            dead_bookmarks.append(b)
+    for d in dead_bookmarks:
+        bookmarks.remove(d)
+
+    record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
 
 
 def main_menu():
