@@ -755,7 +755,7 @@ def move_file_to_cache(new_file_path):
     return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
 
 
-def add_bookmark(record_id):
+def add_bookmark(user_name, record_id):
     check = bliss.one("SELECT title FROM resources WHERE id=?", (record_id,))
     assert check is not None
     user_name = os.environ["USERNAME"]

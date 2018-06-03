@@ -127,7 +127,6 @@ class RecordListViewer(wx.Frame):
 
         self.Show()
 
-
     def export_csv(self, e, dest=None):
         if dest is None:
             dlg = wx.FileDialog(self, "Select Destination:", os.environ["USERPROFILE"], "Export.csv",

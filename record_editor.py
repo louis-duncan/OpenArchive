@@ -163,8 +163,8 @@ class RecordEditor(wx.Frame):
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
-        self.add_to_list_button = wx.Button(bg_panel, size=(100, 35), label="Add To My List")
-        main_buttons_sizer.Add(self.add_to_list_button)
+        self.bookmark_button = wx.Button(bg_panel, size=(100, 35), label="Add To My List")
+        main_buttons_sizer.Add(self.bookmark_button)
 
         main_buttons_sizer.Add((0, 0), wx.EXPAND)
 
@@ -252,7 +252,7 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.save_record, self.save_button)
 
         # My List button.
-        self.Bind(wx.EVT_BUTTON, self.add_bookmark, self.add_to_list_button)
+        self.Bind(wx.EVT_BUTTON, self.bookmark_button_press, self.bookmark_button)
 
         # Close Button > Close Frame
         self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
@@ -420,9 +420,12 @@ class RecordEditor(wx.Frame):
         self.file_list_box.Delete(self.file_list_box.GetSelection())
         self.set_changed()
 
-    def add_bookmark(self, event):
+    def bookmark_button_press(self, event: wx.EVT_BUTTON):
         assert str(self.record.record_id) not in ("New Record", "0")
-        database_io.add_bookmark(self.record.record_id)
+        if event.GetEventObject().Label == "Add To My List":
+            database_io.add_bookmark(os.environ["USERNAME"], self.record.record_id)
+        else:
+            database_io.remove_bookmark(os.environ["USERNAME"], self.record.record_id)
         self.refresh_all()
 
     def close_button_press(self, event):
@@ -666,15 +669,16 @@ class RecordEditor(wx.Frame):
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
                                                                   str(self.record.last_changed_time_string()))
 
-        self.add_to_list_button.Disable()
-        self.add_to_list_button.Label = "Add To My List"
+        self.bookmark_button.Label = "Add To My List"
+        self.bookmark_button.Enable()
         if self.record.record_id in ("New Record", "0", 0):
-            pass
+            self.bookmark_button.Disable()
+
         else:
             if self.record.record_id in database_io.get_user_bookmarks():
-                self.add_to_list_button.Label = "In Your List"
+                self.bookmark_button.Label = "Remove From\nMy List"
             else:
-                self.add_to_list_button.Enable()
+                pass
 
         self.set_changed()
 
@@ -818,5 +822,5 @@ def main(record_obj):
 if __name__ == "__main__":
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
-    r = database_io.get_record_by_id(104)
+    r = database_io.get_record_by_id(82)
     main(r)
