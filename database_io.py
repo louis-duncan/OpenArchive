@@ -17,9 +17,9 @@ __title__ = "OpenArchive"
 invalid_chars = ""
 
 # Define database locations.
-DATABASE_LOCATION = os.path.abspath(".\\new\\new.db")
-ARCHIVE_LOCATION = os.path.abspath(".\\new\\repo")  # os.path.join(os.environ["ONEDRIVE"], "Test DB Location")
-TEMP_DATA_LOCATION = os.path.abspath(".\\new\\temp")  # os.path.join(os.environ["TEMP"], "OpenArchive")
+DATABASE_LOCATION = os.path.abspath(".\\bin\\archive.db")
+ARCHIVE_LOCATION = os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
+TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
