@@ -16,10 +16,17 @@ __title__ = "OpenArchive"
 # noinspection SpellCheckingInspection
 invalid_chars = ""
 
-# Define database locations.
-DATABASE_LOCATION = os.path.abspath(".\\bin\\archive.db")
-ARCHIVE_LOCATION = os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
+# Root path of the repo.
+ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")  # os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
+# Path of the sql database file.
+DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "test.db"))  # os.path.abspath(".\\bin\\archive.db")
+# The sub directory in which OpenArchive will place new uploaded content.
+ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
+# Directories in which files are left in place and not copied to the archive when linked.
+ARCHIVE_INCLUDED_DIRS = [os.path.abspath(".\\Also Included"),]
+# Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
+# Start DateTime from which all dates are calculated as a difference.
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
@@ -199,6 +206,9 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
                 else:
                     tags.append(p.upper())
             return tags
+
+
+
 
 
 def create_new_database():
@@ -603,7 +613,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         # The remaining files in the submitted list are new links, so deal with them.
         for f in files_to_link:
             link_f = os.path.abspath(f)
-            if link_f.startswith(os.path.abspath(ARCHIVE_LOCATION)): # If file in archive, re-link.
+            if link_f.startswith(os.path.abspath(ARCHIVE_LOCATION_ROOT)): # If file in archive, re-link.
                 pass
             else: # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
@@ -663,7 +673,7 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
 
 
 def move_file_to_archive(cached_path=""):
-    new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION)
+    new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
     new_full_path = os.path.abspath(os.path.join(new_root, os.path.basename(cached_path)))
     return shutil.copy2(cached_path, new_full_path)
 
@@ -782,6 +792,56 @@ def get_files_links(file_path):
     return bliss.all("SELECT * FROM main.file_links WHERE file_path=?", (file_path,))
 
 
+def is_file_in_archive(file_path):
+    in_archive = False
+    full_path = os.path.abspath(file_path)
+    if full_path.startswith(os.path.abspath(ARCHIVE_LOCATION_ROOT) + "\\"):
+        in_archive = True
+    else:
+        for i_path in ARCHIVE_INCLUDED_DIRS:
+            if full_path.startswith(os.path.abspath(i_path) + "\\"):
+                in_archive = True
+                break
+            else:
+                pass
+    return in_archive
+
+
+# Main Script
+
+if os.path.exists(ARCHIVE_LOCATION_ROOT):
+    pass
+else:
+    try:
+        os.mkdir(ARCHIVE_LOCATION_ROOT)
+    except:
+        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
+                       "{}\n"
+                       "\n"
+                       "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
+
+if os.path.exists(ARCHIVE_LOCATION_SUB):
+    pass
+else:
+    try:
+        os.mkdir(ARCHIVE_LOCATION_SUB)
+    except:
+        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
+                       "{}\n"
+                       "\n"
+                       "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
+
+if os.path.exists(TEMP_DATA_LOCATION):
+    pass
+else:
+    try:
+        os.mkdir(TEMP_DATA_LOCATION)
+    except:
+        easygui.msgbox("OpenArchive could not access or create the temporary data location at:\n"
+                       "{}\n"
+                       "\n"
+                       "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
+
 try:
     if os.path.exists(DATABASE_LOCATION):
         pass
@@ -797,25 +857,3 @@ except sqlite3.OperationalError:
                    "\n"
                    "The path may not be valid.".format(DATABASE_LOCATION))
     exit()
-
-if os.path.exists(ARCHIVE_LOCATION):
-    pass
-else:
-    try:
-        os.mkdir(ARCHIVE_LOCATION)
-    except:
-        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
-                       "{}\n"
-                       "\n"
-                       "The program will now exit.".format(ARCHIVE_LOCATION))
-
-if os.path.exists(TEMP_DATA_LOCATION):
-    pass
-else:
-    try:
-        os.mkdir(TEMP_DATA_LOCATION)
-    except:
-        easygui.msgbox("OpenArchive could not access or create the temporary data location at:\n"
-                       "{}\n"
-                       "\n"
-                       "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)

@@ -397,7 +397,7 @@ class RecordEditor(wx.Frame):
         if (len(links) == 1) and links[0].record_id != self.record.record_id:
             # This allows the process to continue is there is only one link, but that link is from a different record.
             pass
-        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION)):
+        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_ROOT)):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
             dlg = wx.MessageDialog(self, "Are you sure you want to unlink this file?\n"
                                          "\n"
@@ -696,8 +696,7 @@ class RecordEditor(wx.Frame):
         else:
             pass
         # Copy it to the cache
-        if new_file_path.startswith(database_io.ARCHIVE_LOCATION)\
-                or new_file_path.startswith(database_io.TEMP_DATA_LOCATION):
+        if database_io.is_file_in_archive(new_file_path):
             pass
         else:
             new_file_path = database_io.move_file_to_cache(new_file_path)

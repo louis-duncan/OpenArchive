@@ -62,7 +62,7 @@ def main_menu():
     msg = """- Welcome to OpenArchive -
     
 Database File: {}
-Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIVE_LOCATION)
+Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIVE_LOCATION_ROOT)
     while True:
         choice = easygui.buttonbox(msg, __title__, choices, )
         if choice is None:
