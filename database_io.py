@@ -23,7 +23,7 @@ GLOBAL_CONFIG = ".\\bin\\global_config.cfg"
 # Root path of the repo.
 ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")  # os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
 # Path of the sql database file.
-DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "test.db"))  # os.path.abspath(".\\bin\\archive.db")
+DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))  # os.path.abspath(".\\bin\\archive.db")
 # The sub directory in which OpenArchive will place new uploaded content.
 ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 # Directories in which files are left in place and not copied to the archive when linked.
@@ -35,27 +35,27 @@ EPOCH = datetime.datetime(1970, 1, 1)
 
 
 class ArchiveRecord:
-    record_id = None
-    title = ""
-    description = ""
-    record_type = None
-    local_auth = None
-    start_date = datetime.datetime
-    end_date = datetime.datetime
-    tags = []
-    physical_ref = ""
-    other_ref = ""
-    linked_files = []
-    thumb_files = []
-    created_by = ""
-    created_time = datetime.datetime
-    last_changed_by = ""
-    last_changed_time = datetime.datetime
+##    record_id = None
+##    title = ""
+##    description = ""
+##    record_type = None
+##    local_auth = None
+##    start_date = datetime.datetime
+##    end_date = datetime.datetime
+##    tags = []
+##    physical_ref = ""
+##    other_ref = ""
+##    linked_files = []
+##    thumb_files = []
+##    created_by = ""
+##    created_time = datetime.datetime
+##    last_changed_by = ""
+##    last_changed_time = datetime.datetime
     tags_prompt = 'Enter tags comma separated. (eg. tag1, tag2,...)'
 
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
-                 start_date=None, end_date=None, physical_ref="", other_ref="", tags=[], linked_files=[],
+                 start_date=None, end_date=None, physical_ref="", other_ref="", new_tags=[], linked_files=[],
                  thumb_files=[], created_by=None, created_time=None, last_changed_by=None, last_changed_time=None):
         self.record_id = record_id
         self.title = title
@@ -66,7 +66,7 @@ class ArchiveRecord:
         self.end_date = end_date
         self.physical_ref = physical_ref
         self.other_ref = other_ref
-        self.tags = tags
+        self.tags = new_tags
         self.linked_files = linked_files
         self.thumb_files = thumb_files
         self.created_by = created_by
@@ -97,7 +97,17 @@ class ArchiveRecord:
         else:
             desc_string = self.description
 
-        return "{} - {} - {}".format(id_string, title_string.ljust(title_len), desc_string.ljust(desc_len))
+        return "ID: {}\nTitle: {}\nDecription:\n{}\nType: {}\nAuth: {}\nDates: {} - {}\nPhysical Ref: {}\nOther Ref: {}\nTags: {}".format(self.record_id,
+                                                                                                                                          self.title,
+                                                                                                                                          self.description,
+                                                                                                                                          self.record_type,
+                                                                                                                                          self.local_auth,
+                                                                                                                                          self.start_date_string(),
+                                                                                                                                          self.end_date_string(),
+                                                                                                                                          self.physical_ref,
+                                                                                                                                          self.other_ref,
+                                                                                                                                          self.string_tags(),
+                                                                                                                                          )
 
     def launch_file(self, file_index=0, file_path=None):
         if (self.linked_files is None) and (file_path is None):
@@ -191,11 +201,13 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
             pass
         else:
             parts = self.format_string_to_tags(tags_to_add)
+            new_tags = []
             for p in parts:
-                if p in self.tags:
+                if p in new_tags:
                     pass
                 else:
-                    self.tags.append(p)
+                    new_tags.append(p)
+            self.tags = new_tags
 
     def format_string_to_tags(self, text):
         if text == self.tags_prompt:
@@ -213,19 +225,102 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 
 def load_config():
+    global LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION
+
+    local_config = {"GLOBAL_CONFIG" : GLOBAL_CONFIG,
+                    "TEMP_DATA_LOCATION" : TEMP_DATA_LOCATION,
+                    }
+    formatted_incs = ""
+    for i in ARCHIVE_INCLUDED_DIRS:
+        formatted_incs += i + "|"
+    formatted_incs = formatted_incs.strip("|")
+        
+    global_config = {"DATABASE_LOCATION" : DATABASE_LOCATION,
+                     "ARCHIVE_LOCATION_ROOT" : ARCHIVE_LOCATION_ROOT,
+                     "ARCHIVE_LOCATION_SUB" : ARCHIVE_LOCATION_SUB,
+                     "ARCHIVE_INCLUDED_DIRS" : formatted_incs,
+                     }
+    # Load local config
+    print("Loading local config...")
     try:
         with open(LOCAL_CONFIG, "r") as file:
             local_config_lines = file.readlines()
     except FileNotFoundError:
             local_config_lines = []
 
-    LocalConfig = collections.namedtuple("LocalConfig", ("GLOBAL_CONFIG", "LOCAL_TEMP_DATA"))
-    GlobalConfig = collections.nametuple("GlobalConfig", ("DATABASE_LOCATION",
-                                                          "ARCHIVE_LOCATION_ROOT",
-                                                          "ARCHIVE_LOCATION_SUB",
-                                                          "ARCHIVE_INCLUDED_DIRS"))
+    for l in local_config_lines:
+        v_name, v_value = l.split("=", 1)
+        v_name = v_name.strip()
+        v_value = v_value.strip()
+        try:
+            t = local_config[v_name]
+            local_config[v_name] = v_value
+        except KeyError:
+            print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
 
+    # Format the read data
+    local_config["GLOBAL_CONFIG"] = os.path.abspath(local_config["GLOBAL_CONFIG"])
+    local_config["TEMP_DATA_LOCATION"] = os.path.abspath(local_config["TEMP_DATA_LOCATION"])
 
+    # Set values
+    GLOBAL_CONFIG = local_config["GLOBAL_CONFIG"]
+    TEMP_DATA_LOCATION = local_config["TEMP_DATA_LOCATION"]
+    
+    # Re-write the config file
+    try:
+        os.mkdir(os.path.dirname(LOCAL_CONFIG))
+    except FileExistsError:
+        pass
+    with open(LOCAL_CONFIG, "w") as file:
+        lines = []
+        for v in local_config:
+            lines.append("{} = {}\n".format(v, local_config[v]))
+        file.writelines(lines)
+
+    print("Loading global config...")
+    # Load global config
+    try:
+        with open(GLOBAL_CONFIG, "r") as file:
+            global_config_lines = file.readlines()
+    except FileNotFoundError:
+            global_config_lines = []
+
+    for l in global_config_lines:
+        v_name, v_value = l.split("=", 1)
+        v_name = v_name.strip()
+        v_value = v_value.strip()
+        try:
+            t = global_config[v_name]
+            global_config[v_name] = v_value
+        except KeyError:
+            print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
+
+    # Format the read data
+    global_config["DATABASE_LOCATION"] = os.path.abspath(global_config["DATABASE_LOCATION"])
+    global_config["ARCHIVE_LOCATION_ROOT"] = os.path.abspath(global_config["ARCHIVE_LOCATION_ROOT"])
+    global_config["ARCHIVE_LOCATION_SUB"] = os.path.abspath(global_config["ARCHIVE_LOCATION_SUB"])
+    listed_incs = []
+    for p in global_config["ARCHIVE_INCLUDED_DIRS"].split("|"):
+        listed_incs.append(os.path.abspath(p.strip()))        
+
+    # Set values
+    DATABASE_LOCATION = global_config["DATABASE_LOCATION"]
+    ARCHIVE_LOCATION_ROOT = global_config["ARCHIVE_LOCATION_ROOT"]
+    ARCHIVE_LOCATION_SUB = global_config["ARCHIVE_LOCATION_SUB"]
+    ARCHIVE_INCLUDED_DIRS = listed_incs
+    
+    # Re-write the config file
+    try:
+        os.mkdir(os.path.dirname(GLOBAL_CONFIG))
+    except FileExistsError:
+        pass
+    with open(GLOBAL_CONFIG, "w") as file:
+        lines = []
+        for v in global_config:
+            lines.append("{} = {}\n".format(v, global_config[v]))
+        file.writelines(lines)
+        
+  
 def create_new_database():
     try:
         os.mkdir(os.path.abspath(os.path.dirname(DATABASE_LOCATION)))
@@ -414,7 +509,7 @@ def format_sql_to_record_obj(db_record_object):
                                end_date=end_date,
                                physical_ref=db_record_object.physical_ref,
                                other_ref=db_record_object.other_ref,
-                               tags=tags,
+                               new_tags=tags,
                                linked_files=linked_files,
                                thumb_files=thumb_files,
                                created_by=db_record_object.created_by,
@@ -777,7 +872,10 @@ def add_new_local_authority(local_auth_string):
 
 
 def move_file_to_cache(new_file_path):
-    return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
+    if os.path.abspath(TEMP_DATA_LOCATION) == os.path.commonpath((TEMP_DATA_LOCATION, new_file_path)):
+        return os.path.abspath(new_file_path)
+    else:
+        return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
 
 
 def add_bookmark(user_name, record_id):
@@ -823,6 +921,8 @@ def is_file_in_archive(file_path):
 
 
 # Main Script
+
+load_config()
 
 if os.path.exists(ARCHIVE_LOCATION_ROOT):
     pass
