@@ -32,10 +32,11 @@ def detailed_search():
     # todo: Write detailed search
 
 
-def launch_upload_agent():
+def launch_record_viewer():
     # Created Blank Record and loads editor.
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
+    print(r)
     # r = database_io.get_record_by_id(50)
     record_editor.main(r)
 
@@ -72,7 +73,7 @@ Archive Location: {}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIV
         elif choice == choices[1]:
             detailed_search()
         elif choice == choices[2]:
-            launch_upload_agent()
+            launch_record_viewer()
         elif choice == choices[3]:
             access_users_list()
         else:

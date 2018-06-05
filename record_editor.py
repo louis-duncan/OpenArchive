@@ -22,7 +22,7 @@ __title__ = "OpenArchive - Record Viewer"
 
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
-
+        print(record_to_edit)
         wx.Frame.__init__(self, parent, title=title, size=(900, 500),
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
@@ -140,10 +140,10 @@ class RecordEditor(wx.Frame):
 
         # File Buttons
         file_buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.upload_single_button = wx.Button(bg_panel, size=(100, -1), label="Upload\nSingle File")
+        self.upload_single_button = wx.Button(bg_panel, size=(100, -1), label="Upload\nSingle File(s)")
         file_buttons_sizer.Add(self.upload_single_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
-        self.upload_multiple_button = wx.Button(bg_panel, size=(100, -1), label="Merge to PDF\nand Upload")
+        self.upload_multiple_button = wx.Button(bg_panel, size=(100, -1), label="Upload Many\nAs One PDF")
         file_buttons_sizer.Add(self.upload_multiple_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
@@ -684,28 +684,40 @@ class RecordEditor(wx.Frame):
 
     def link_new_file(self, event=None, new_file_path=None):
         """Links single file to the record."""
+        
+        assert type(new_file_path) in (str, tuple, list, type(None))
+                
         # Select the file
         if new_file_path is None:
             file_open_dlg = wx.FileDialog(self, __title__ + " - Select File To Link",
-                                          style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+                                          style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE)
             resp = file_open_dlg.ShowModal()
             if resp == wx.ID_CANCEL:
                 return None
             else:
-                new_file_path = file_open_dlg.GetPath()
+                new_file_path = file_open_dlg.GetPaths()
         else:
             pass
-        # Copy it to the cache
-        if database_io.is_file_in_archive(new_file_path):
-            pass
+        
+        if type(new_file_path) == str:
+            print("String Path")
+            # Copy it to the cache
+            if database_io.is_file_in_archive(new_file_path):
+                pass
+            else:
+                new_file_path = database_io.move_file_to_cache(new_file_path)
+            # Add the cached dir to the temp dir list
+            self.temp_file_links.append(new_file_path)
+            self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
+            self.file_list_box.SetSelection(len(self.temp_file_links) - 1)
+            self.file_link_selected()
+            self.set_changed()
+        elif type(new_file_path) in (tuple, list):
+            print("List/Tuple Path")
+            for f in new_file_path:
+                self.link_new_file(new_file_path=f)
         else:
-            new_file_path = database_io.move_file_to_cache(new_file_path)
-        # Add the cached dir to the temp dir list
-        self.temp_file_links.append(new_file_path)
-        self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
-        self.file_list_box.SetSelection(len(self.temp_file_links) - 1)
-        self.file_link_selected()
-        self.set_changed()
+            return None
 
     def merge_and_link_multiple_files(self, event):
         # Select the files
