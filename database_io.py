@@ -16,6 +16,10 @@ __title__ = "OpenArchive"
 # noinspection SpellCheckingInspection
 invalid_chars = ""
 
+# Config Path
+LOCAL_CONFIG = ".\\bin\\local_config.cfg"
+GLOBAL_CONFIG = ".\\bin\\global_config.cfg"
+
 # Root path of the repo.
 ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")  # os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
 # Path of the sql database file.
@@ -208,7 +212,18 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
             return tags
 
 
+def load_config():
+    try:
+        with open(LOCAL_CONFIG, "r") as file:
+            local_config_lines = file.readlines()
+    except FileNotFoundError:
+            local_config_lines = []
 
+    LocalConfig = collections.namedtuple("LocalConfig", ("GLOBAL_CONFIG", "LOCAL_TEMP_DATA"))
+    GlobalConfig = collections.nametuple("GlobalConfig", ("DATABASE_LOCATION",
+                                                          "ARCHIVE_LOCATION_ROOT",
+                                                          "ARCHIVE_LOCATION_SUB",
+                                                          "ARCHIVE_INCLUDED_DIRS"))
 
 
 def create_new_database():
