@@ -8,8 +8,6 @@ from wx.lib.pdfviewer import pdfViewer
 import os
 import database_io
 import textdistance
-import shutil
-
 import PIL
 import PIL.Image
 from PyPDF2 import PdfFileWriter, PdfFileReader
@@ -22,16 +20,16 @@ __title__ = "OpenArchive - Record Viewer"
 
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
-        print(record_to_edit)
+        #print(record_to_edit)
         wx.Frame.__init__(self, parent, title=title, size=(900, 500),
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
         self.record = record_to_edit
 
-        column_one = wx.GridBagSizer(vgap=10, hgap=10)
-
         # Add bg panel
         bg_panel = wx.Panel(self, size=(2000, 2000))
+
+        column_one = wx.GridBagSizer(vgap=10, hgap=10)
 
         # Add Record ID
         id_lbl = wx.StaticText(bg_panel, label="Record ID:")
@@ -827,7 +825,6 @@ def main(record_obj):
     app = wx.App(False)
     frame = RecordEditor(None, __title__, record_obj)
     app.MainLoop()
-    database_io.clear_cache()
 
 
 if __name__ == "__main__":
@@ -835,3 +832,4 @@ if __name__ == "__main__":
     r.record_id = "New Record"
     r = database_io.get_record_by_id(82)
     main(r)
+    database_io.clear_cache()
