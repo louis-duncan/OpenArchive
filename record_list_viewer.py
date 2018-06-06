@@ -6,50 +6,13 @@ import easygui
 import csv
 import database_io
 import os
+import record_editor
 
 from database_io import ArchiveRecord
 
 __title__ = "OpenArchive"
 
 test_data = None
-
-
-class DataModel(dv.DataViewIndexListModel):
-    def __init__(self, data):
-        dv.DataViewIndexListModel.__init__(self, len(data))
-        self.data = data
-
-    # All of our columns are strings.  If the model or the renderers
-    # in the view are other types then that should be reflected here.
-    def GetColumnType(self, col):
-        return "string"
-
-    # This method is called to provide the data object for a
-    # particular row,col
-    def GetValueByRow(self, row, col):
-        return self.data[row][col]
-
-    # This method is called when the user edits a data item in the view.
-    def SetValueByRow(self, value, row, col):
-        self.data[row][col] = value
-        return True
-
-    # Report how many columns this model provides data for.
-    def GetColumnCount(self):
-        return len(self.data[0])
-
-    # Report the number of rows in the model
-    def GetCount(self):
-        return len(self.data)
-
-    # Called to check if non-standard attributes should be used in the
-    # cell at (row, col)
-    def GetAttrByRow(self, row, col, attr):
-        #if col == 3:
-        #    attr.SetColour('blue')
-        #    attr.SetBold(True)
-        #    return True
-        return False
 
 
 class RecordListViewer(wx.Frame):
@@ -78,21 +41,21 @@ class RecordListViewer(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             self.Destroy()
+            return None
         else:
             pass
 
         # Create List Control
-        self.dvc = dv.DataViewCtrl(self,
-                                   style=wx.BORDER_THEME
-                                   | dv.DV_ROW_LINES
-                                   | dv.DV_VERT_RULES
-                                   | dv.DV_VARIABLE_LINE_HEIGHT
-                                   )
-        self.Bind(wx.dataview.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
+        self.dvc = dv.DataViewListCtrl(self,
+                                       style=wx.BORDER_THEME
+                                             | dv.DV_ROW_LINES
+                                             | dv.DV_VERT_RULES
+                                             | dv.DV_VARIABLE_LINE_HEIGHT
+                                       )
 
         self.data = []
         for r in record_ids:
-            print(r)
+            #print(r)
             record: ArchiveRecord = database_io.get_record_by_id(r)
 
             # Todo: Add catch for none records. Including removing dead bookmarks.
@@ -111,14 +74,17 @@ class RecordListViewer(wx.Frame):
                      )
             self.data.append(entry)
 
+        for r in self.data:
+            self.dvc.AppendItem(r)
+
+
         # Add columns
         for i, (h, w) in enumerate(headings):
             self.dvc.AppendTextColumn(h, i, width=w)
 
-        model = DataModel(self.data)
-        self.dvc.AssociateModel(model)
-
         self.export_button = wx.Button(self, -1, "Export to '.csv'")
+
+        self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
         self.Bind(wx.EVT_BUTTON, self.export_csv, self.export_button)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -132,10 +98,9 @@ class RecordListViewer(wx.Frame):
         self.Show()
 
     def record_activated(self, event):
-        selections = self.dvc.GetSelections()
-        #print(selections[0].GetData())
-        # Todo: Fix this!
-        pass
+        selection = self.dvc.GetSelection()
+        id_of_record_to_show = self.data[int(selection.ID) - 1][0]
+        record_editor.main(database_io.get_record_by_id(id_of_record_to_show))
 
     def export_csv(self, e, dest=None):
         if dest is None:
