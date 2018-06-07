@@ -73,7 +73,24 @@ Archive Location:
             pass
 
     def on_close(self, e):
-        self.Destroy()
+        dlg = wx.MessageDialog(self, "Continue with Close?\n"
+                                     "\n"
+                                     "All OpenArchive windows will be closed,\n"
+                                     "and any unsaved changes will be lost.",
+                               style=wx.YES_NO | wx.NO_DEFAULT
+                                     | wx.ICON_INFORMATION, caption="Unsaved Changes")
+        resp = dlg.ShowModal()
+        dlg.Destroy()
+        if resp == wx.ID_YES:
+            pass
+        elif resp == wx.ID_NO:
+            return None
+        else:
+            return None
+        print("Closing")
+        database_io.clear_cache()
+        database_io.conn.close()
+        os.kill(os.getpid(), signal.CTRL_C_EVENT)
 
 
 def quick_search():
@@ -133,10 +150,9 @@ def main(title):
 
 
 if __name__ == "__main__":
+    print("PID:",os.getpid())
+    print("PPID:",os.getppid())
     main(__title__)
-    print("Closing")
-    database_io.clear_cache()
-    database_io.conn.close()
-    os.kill(os.getppid(), signal.)
+    os.system("TaskKill /PID {}".format(os.getpid()))
 else:
     pass
