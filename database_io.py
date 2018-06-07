@@ -27,7 +27,7 @@ DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_ar
 # The sub directory in which OpenArchive will place new uploaded content.
 ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 # Directories in which files are left in place and not copied to the archive when linked.
-ARCHIVE_INCLUDED_DIRS = [os.path.abspath(".\\Also Included"),]
+ARCHIVE_INCLUDED_DIRS = []
 # Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
 # Start DateTime from which all dates are calculated as a difference.
@@ -252,11 +252,14 @@ def load_config():
         v_name, v_value = l.split("=", 1)
         v_name = v_name.strip()
         v_value = v_value.strip()
-        try:
-            t = local_config[v_name]
-            local_config[v_name] = v_value
-        except KeyError:
-            print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
+        if v_value == "":
+            pass
+        else:
+            try:
+                t = local_config[v_name]
+                local_config[v_name] = v_value
+            except KeyError:
+                print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
 
     # Format the read data
     local_config["GLOBAL_CONFIG"] = os.path.abspath(local_config["GLOBAL_CONFIG"])

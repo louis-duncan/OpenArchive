@@ -1,1 +1,1 @@
-venv\Scripts\python.exe main.pyw
+start venv\Scripts\pythonw.exe main.pyw

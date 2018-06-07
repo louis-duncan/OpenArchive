@@ -6,6 +6,7 @@ import record_list_viewer
 import database_io
 import record_editor
 import wx
+import signal
 
 __title__ = "OpenArchive"
 __author__ = "Louis Thurman"
@@ -14,7 +15,7 @@ __author__ = "Louis Thurman"
 class LaunchPad(wx.Frame):
     def __init__(self, parent, title):
 
-        window_size = (400, 280)
+        window_size = (500, 280)
         wx.Frame.__init__(self, parent, title=title, size=window_size,
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
@@ -52,6 +53,7 @@ Archive Location:
         sizer.AddSpacer(10)
 
         self.Bind(wx.EVT_BUTTON, self.button_pressed)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         self.SetSizer(sizer)
 
@@ -69,6 +71,9 @@ Archive Location:
             access_users_list()
         else:
             pass
+
+    def on_close(self, e):
+        self.Destroy()
 
 
 def quick_search():
@@ -132,5 +137,6 @@ if __name__ == "__main__":
     print("Closing")
     database_io.clear_cache()
     database_io.conn.close()
+    os.kill(os.getppid(), signal.)
 else:
     pass
