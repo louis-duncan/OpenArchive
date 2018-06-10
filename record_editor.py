@@ -18,6 +18,29 @@ no_locate_file = ".\\bin\\no_locate.jpg"
 __title__ = "OpenArchive - Record Viewer"
 
 
+class FileLinkPopupMenu(wx.Menu):
+    def __init__(self, file_path=""):
+        wx.Menu.__init__(self)
+
+        self.file_path = file_path
+
+        item = wx.MenuItem(self, wx.NewId(), "Open file in it's archive location...")
+        self.Append(item)
+        self.Bind(wx.EVT_MENU, self.on_select, item)
+
+    def on_select(self, event):
+        try:
+            os.startfile(self.file_path)
+        except FileNotFoundError:
+            dlg = wx.MessageDialog(self, "Could Not Load File!\n"
+                                         "\n"
+                                         "The files could not be found at location:\n"
+                                         "{}".format(self.file_path),
+                                   "OpenArchive - File Error")
+            dlg.ShowModal()
+            dlg.Destroy()
+
+
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
         #print(record_to_edit)
@@ -252,9 +275,25 @@ class RecordEditor(wx.Frame):
         # My List button.
         self.Bind(wx.EVT_BUTTON, self.bookmark_button_press, self.bookmark_button)
 
+        # Right Clicks
+        self.file_list_box.Bind(wx.EVT_RIGHT_DOWN, self.on_right_click)
+
         # Close Button > Close Frame
         self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
         self.Bind(wx.EVT_CLOSE, self.close_button_press)
+
+    def on_right_click(self, event):
+        pos = event.GetPosition()
+        right_clicked_item = self.file_list_box.HitTest(pos)
+        if right_clicked_item == -1:
+            return None
+        else:
+            # Show context menu.
+            pass
+        print("Hit", right_clicked_item)
+        menu = FileLinkPopupMenu(self.temp_file_links[right_clicked_item])
+        self.file_list_box.PopupMenu(menu, pos)
+        menu.Destroy()
 
     def update_title(self, event):
         self.set_changed()
