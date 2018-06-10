@@ -195,14 +195,11 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
     def string_tags(self, tags_to_add=None):
         prompt = self.tags_prompt
         if tags_to_add is None:
-            if len(self.tags) == 0:
-                return prompt
-            else:
-                output = ""
-                for t in self.tags:
-                    output += t + ", "
-                output = output.strip(", ")
-                return output
+            output = ""
+            for t in self.tags:
+                output += t + ", "
+            output = output.strip(", ")
+            return output
         elif tags_to_add == prompt:
             pass
         else:
@@ -866,8 +863,9 @@ def score_results(results, text):
         #print(key_words)
         #print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
-        if score < 1.0:
-            score = 0.0
+        #if score < 1.0:
+        #    score = 0.0
+        score = round(score, 1)
         print(r.id, score)
         if score == 0.0:
             pass
