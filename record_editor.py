@@ -141,7 +141,9 @@ class RecordEditor(wx.Frame):
         # Add Tags Box
         tags_lbl = wx.StaticText(bg_panel, label="Tags:")
         column_one.Add(tags_lbl, (8, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-        self.tags_box = wx.TextCtrl(bg_panel, value=str(self.record.string_tags()), size=(350, -1))
+        self.tags_box = wx.SearchCtrl(bg_panel, size=(350, -1))
+        self.tags_box.ShowSearchButton(False)
+        self.tags_box.SetDescriptiveText('Enter tags comma separated. (eg. tag1, tag2,...)')
         column_one.Add(self.tags_box, pos=(8, 2), span=(1, 4))
 
         # New Column!
@@ -277,13 +279,23 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.bookmark_button_press, self.bookmark_button)
 
         # Left Clicks
-        # Todo: Add capturing of left clicks so allow refresh of already selected items.
+        self.file_list_box.Bind(wx.EVT_LEFT_DOWN, self.on_left_click)
+
         # Right Clicks
         self.file_list_box.Bind(wx.EVT_RIGHT_DOWN, self.on_right_click)
 
         # Close Button > Close Frame
         self.Bind(wx.EVT_BUTTON, self.close_button_press, self.close_button)
         self.Bind(wx.EVT_CLOSE, self.close_button_press)
+
+    def on_left_click(self, event):
+        pos = event.GetPosition()
+        left_clicked_item = self.file_list_box.HitTest(pos)
+        if left_clicked_item == -1:
+            pass
+        else:
+            self.file_list_box.SetSelection(left_clicked_item)
+            self.file_link_selected()
 
     def on_right_click(self, event):
         pos = event.GetPosition()
@@ -315,7 +327,7 @@ class RecordEditor(wx.Frame):
                       "'Type: Sub-Type'"
                 input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Type")
                 input_dlg.SetValue(new_type)
-                if input_dlg.ShowModal() == wx.ID_OK:
+                if (input_dlg.ShowModal() == wx.ID_OK) and (input_dlg.GetValue().strip() != ""):
                     new_type = input_dlg.GetValue()
                 else:
                     # I no new type given, quit here.
@@ -361,8 +373,8 @@ class RecordEditor(wx.Frame):
                 msg = "Enter new local authority:"
                 input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Local Authority")
                 input_dlg.SetValue(new_local_auth)
-                if input_dlg.ShowModal() == wx.ID_OK:
-                    new_local_auth = input_dlg.GetValue()
+                if (input_dlg.ShowModal() == wx.ID_OK) and (input_dlg.GetValue().strip() != ""):
+                    new_local_auth = input_dlg.GetValue().strip()
                 else:
                     # I no new auth given, quit here.
                     self.local_authorities_comb.SetSelection(0)
