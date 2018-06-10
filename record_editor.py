@@ -6,6 +6,7 @@ import wx.adv
 from wx.lib import sized_controls
 from wx.lib.pdfviewer import pdfViewer
 import os
+import subprocess
 import database_io
 import textdistance
 import PIL
@@ -30,8 +31,7 @@ class FileLinkPopupMenu(wx.Menu):
 
     def on_select(self, event):
         try:
-            #os.startfile(self.file_path)
-            os.system(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
+            subprocess.Popen(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
         except FileNotFoundError:
             dlg = wx.MessageDialog(self, "Could Not Load File!\n"
                                          "\n"
@@ -276,6 +276,8 @@ class RecordEditor(wx.Frame):
         # My List button.
         self.Bind(wx.EVT_BUTTON, self.bookmark_button_press, self.bookmark_button)
 
+        # Left Clicks
+        # Todo: Add capturing of left clicks so allow refresh of already selected items.
         # Right Clicks
         self.file_list_box.Bind(wx.EVT_RIGHT_DOWN, self.on_right_click)
 
