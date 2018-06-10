@@ -62,7 +62,7 @@ Archive Location:
     def button_pressed(self, e):
         lbl_pressed = e.GetEventObject().Label
         if lbl_pressed == self.choices[0]:
-            quick_search()
+            self.quick_search()
         elif lbl_pressed == self.choices[1]:
             detailed_search()
         elif lbl_pressed == self.choices[2]:
@@ -71,6 +71,23 @@ Archive Location:
             access_users_list()
         else:
             pass
+
+    def quick_search(self):
+        dlg = wx.TextEntryDialog(self,
+                                 message="Enter text to search:",
+                                 caption=__title__ + " - Quick Search"
+                                 )
+        resp = dlg.ShowModal()
+        dlg.Destroy()
+        if resp == wx.ID_CANCEL:
+            print("Cancelled")
+            return None
+        else:
+            pass
+        results = database_io.search_archive(dlg.GetValue())
+        for r in results:
+            print(r.id)
+        record_list_viewer.main("Search Results", results)
 
     def on_close(self, e):
         dlg = wx.MessageDialog(self, "Continue with Close?\n"
@@ -90,20 +107,8 @@ Archive Location:
         print("Closing")
         database_io.clear_cache()
         database_io.conn.close()
+        self.Destroy()
         os.kill(os.getpid(), signal.CTRL_C_EVENT)
-
-
-def quick_search():
-    # todo: Write quick search
-    # Get user input
-    msg = "Enter Search Terms:"
-    user_input = easygui.enterbox(msg, __title__ + " - Quick Search")
-    if user_input is None:
-        pass
-    else:
-        pass
-        # Perform search
-        # Display results
 
 
 def detailed_search():

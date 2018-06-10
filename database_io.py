@@ -114,7 +114,7 @@ class ArchiveRecord:
             pass
         else:
             try:
-                print(file_path)
+                print("Launching", file_path)
                 if file_path is not None:
                     path = file_path
                 else:
@@ -122,11 +122,17 @@ class ArchiveRecord:
                 print(path)
                 if os.path.exists(path):
                     # Cache file
-                    file_extension = path.split(".")[-1]
-                    fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", TEMP_DATA_LOCATION)
-                    os.close(fd)
-                    shutil.copy2(path, cached_path)
-                    fail = os.startfile(cached_path)
+                    # See if the file is in the Archive, if not, open it directly.
+                    in_archive = check_if_in_archive(path)
+                    if in_archive:
+                        file_extension = path.split(".")[-1]
+                        fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", TEMP_DATA_LOCATION)
+                        os.close(fd)
+                        shutil.copy2(path, cached_path)
+                        path = cached_path
+                    else:
+                        pass
+                    fail = os.startfile(path)
                     if fail:
                         return "Unknown Error"
                     else:
@@ -304,8 +310,10 @@ def load_config():
     global_config["ARCHIVE_LOCATION_SUB"] = os.path.abspath(global_config["ARCHIVE_LOCATION_SUB"])
     listed_incs = []
     for p in global_config["ARCHIVE_INCLUDED_DIRS"].split("|"):
-        listed_incs.append(os.path.abspath(p.strip()))        
-
+        sp = p.strip()
+        if sp != "":
+            listed_incs.append(os.path.abspath(sp))
+    print("loaded inc dirs:", listed_incs)
     # Set values
     DATABASE_LOCATION = global_config["DATABASE_LOCATION"]
     ARCHIVE_LOCATION_ROOT = global_config["ARCHIVE_LOCATION_ROOT"]
@@ -668,6 +676,24 @@ def create_cached_record(record_id=None):
         return record_object_path
 
 
+def check_if_in_archive(path):
+    roots_to_check = [os.path.abspath(ARCHIVE_LOCATION_ROOT),
+                      os.path.abspath(ARCHIVE_LOCATION_SUB)]
+    for d in ARCHIVE_INCLUDED_DIRS:
+        roots_to_check.append(os.path.abspath(d))
+
+    in_archive = False
+    for r in roots_to_check:
+        print(r)
+        if os.path.commonpath((path, r)) == r:
+            in_archive = True
+            print("In here!")
+            break
+        else:
+            pass
+    return in_archive
+
+
 def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
     # Commits changes or new record to db
     try:
@@ -726,7 +752,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         # The remaining files in the submitted list are new links, so deal with them.
         for f in files_to_link:
             link_f = os.path.abspath(f)
-            if link_f.startswith(os.path.abspath(ARCHIVE_LOCATION_ROOT)): # If file in archive, re-link.
+            if check_if_in_archive(link_f): # If file in archive, re-link.
                 pass
             else: # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
@@ -795,9 +821,9 @@ def score_results(results, text):
     scores = []
     r: ArchiveRecord
     for r in results:
-        print()
+        #print()
         # Gen score
-        title_similarity = textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
+        title_similarity = 4 * textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
         key_words = text.upper().split(" ")
         # print(text, key_words)
         if text.upper() not in key_words:
@@ -837,15 +863,18 @@ def score_results(results, text):
                     pass
             else:
                 pass
-        print(key_words)
-        print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
+        #print(key_words)
+        #print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
+        if score < 1.0:
+            score = 0.0
         print(r.id, score)
         if score == 0.0:
             pass
         else:
             scores.append((r, score))
     scores.sort(key=lambda s: s[1])
+    scores.reverse()
     final_results = []
     for sr in scores:
         final_results.append(sr[0])

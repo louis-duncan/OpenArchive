@@ -16,14 +16,18 @@ test_data = None
 
 
 class RecordListViewer(wx.Frame):
-    def __init__(self, parent, title, record_ids):
+    def __init__(self, parent, title, records):
         # Define the headings for later
+
+        closing = False
+
         headings = (("ID:", 35),
                     ("Title:", 250),
                     ("Description:", 400),
                     ("Type:", 250),
-                    ("Local Auth:", 120),
+                    ("Local Auth:", 150),
                     ("Date Period:", 150),
+                    ("Tags:", 200)
                     )
 
         total_width = 0
@@ -33,7 +37,7 @@ class RecordListViewer(wx.Frame):
         wx.Frame.__init__(self, parent, title=title,
                           size=(total_width + 20, 500), style=wx.DEFAULT_FRAME_STYLE)
 
-        if len(record_ids) == 0:
+        if len(records) == 0:
             dlg = wx.MessageDialog(self, "No Records\n"
                                          "\n"
                                          "No records to show.",
@@ -41,7 +45,7 @@ class RecordListViewer(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             self.Destroy()
-            return None
+            closing = True
         else:
             pass
 
@@ -54,24 +58,40 @@ class RecordListViewer(wx.Frame):
                                        )
 
         self.data = []
-        for r in record_ids:
+        for r in records:
             #print(r)
-            record: ArchiveRecord = database_io.get_record_by_id(r)
+            if type(r) in (str, int):
+                record: ArchiveRecord = database_io.get_record_by_id(int(r))
+            else:
+                record = database_io.format_sql_to_record_obj(r)
 
             # Todo: Add catch for none records. Including removing dead bookmarks.
             assert record is not None
 
-            dates = ()
-            # Todo: Finish data formatting.
+            dates = []
             date_range_string = ""
-            entry = (record.record_id,
+            if record.start_date is not None:
+                dates.append(record.start_date_string())
+            if record.end_date is not None:
+                dates.append(record.end_date_string())
+
+            if len(dates) == 2:
+                date_range_string = "{} - {}".format(dates[0],
+                                                     dates[1])
+            elif len(dates) == 1:
+                date_range_string = str(dates[0])
+            else:
+                pass
+            entry = [record.record_id,
                      record.title,
                      record.description.replace("\n", " "),
                      record.record_type,
                      record.local_auth,
                      date_range_string,
                      record.string_tags()
-                     )
+                     ]
+            if entry[6] == record.tags_prompt:
+                entry[6] = ""
             self.data.append(entry)
 
         for r in self.data:
@@ -95,7 +115,8 @@ class RecordListViewer(wx.Frame):
 
         self.SetSizer(sizer)
 
-        self.Show()
+        if not closing:
+            self.Show()
 
     def record_activated(self, event):
         selection = self.dvc.GetSelection()
@@ -125,7 +146,7 @@ class RecordListViewer(wx.Frame):
 
 def main(title, record_ids):
     app = wx.App(False)
-    frame = RecordListViewer(None, title, record_ids=record_ids)
+    frame = RecordListViewer(None, title, records=record_ids)
     app.MainLoop()
     database_io.clear_cache()
 
