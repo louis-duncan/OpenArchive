@@ -80,22 +80,54 @@ Archive Location:
             pass
         self.quick_search(search_text)
 
-    def button_pressed(self, e):
-        lbl_pressed = e.GetEventObject().Label
-        if lbl_pressed == self.choices[0]:
-            detailed_search()
-        elif lbl_pressed == self.choices[1]:
-            launch_record_viewer()
-        elif lbl_pressed == self.choices[2]:
-            access_users_list()
-        else:
-            pass
-
     def quick_search(self, search_text):
         results = database_io.search_archive(search_text)
         for r in results:
             print(r.id)
-        record_list_viewer.main("Search Results", results)
+        view_frame = record_list_viewer.RecordListViewer(self, __title__, results)
+
+    def button_pressed(self, e):
+        lbl_pressed = e.GetEventObject().Label
+        if lbl_pressed == self.choices[0]:
+            self.detailed_search()
+        elif lbl_pressed == self.choices[1]:
+            self.launch_record_editor()
+        elif lbl_pressed == self.choices[2]:
+            self.access_users_list()
+        else:
+            pass
+
+    def detailed_search(self):
+        pass
+        # Get user input.
+        # Perform search.
+        # Display results.
+        # todo: Write detailed search
+
+    def launch_record_editor(self):
+        # Created Blank Record and loads editor.
+        r = database_io.ArchiveRecord()
+        r.record_id = "New Record"
+        record_editor.RecordEditor(self, __title__ + " - New Record", r)
+
+    def access_users_list(self):
+        # Access to users list
+        user_name = os.environ["USERNAME"]
+        bookmarks = database_io.get_user_bookmarks(user_name)
+        # Check bookmarks for dead links
+        dead_bookmarks = []
+        for b in bookmarks:
+            test = database_io.get_record_by_id(b)
+            if test is None:
+                database_io.remove_bookmark(user_name, b)
+                dead_bookmarks.append(b)
+        for d in dead_bookmarks:
+            bookmarks.remove(d)
+        record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
+        bookmarks_frame = record_list_viewer.RecordListViewer(self,
+                                                              "{} - User Bookmarks - {}"
+                                                              .format(__title__, user_name.title()), bookmarks)
+        print("Passed")
 
     def on_close(self, e):
         dlg = wx.MessageDialog(self, "Continue with Close?\n"
@@ -119,53 +151,19 @@ Archive Location:
         os.kill(os.getpid(), signal.CTRL_C_EVENT)
 
 
-def detailed_search():
-    pass
-    # Get user input.
-    # Perform search.
-    # Display results.
-    # todo: Write detailed search
-
-
-def launch_record_viewer(r = None):
-    # Created Blank Record and loads editor.
-
-    r = database_io.ArchiveRecord()
-    r.record_id = "New Record"
-    #print(r)
-    # r = database_io.get_record_by_id(50)
-    record_editor.main(r, title=__title__ + " - New Record")
-
-
-def access_users_list():
-    # Access to users list
-    user_name = os.environ["USERNAME"]
-    bookmarks = database_io.get_user_bookmarks(user_name)
-    # Check bookmarks for dead links
-    dead_bookmarks = []
-    for b in bookmarks:
-        test = database_io.get_record_by_id(b)
-        if test is None:
-            database_io.remove_bookmark(user_name, b)
-            dead_bookmarks.append(b)
-    for d in dead_bookmarks:
-        bookmarks.remove(d)
-
-    #print("Launching")
-    record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
-
-
 def main(title):
     app = wx.App(False)
-    frame = LaunchPad(None, title)
+    main_frame = LaunchPad(None, title)
     app.MainLoop()
     database_io.clear_cache()
+    main_frame.Destroy()
+    app.Destroy()
+    print("Exited main")
 
 
 if __name__ == "__main__":
     print("PID:",os.getpid())
     print("PPID:",os.getppid())
     main(__title__)
-    os.system("TaskKill /PID {}".format(os.getpid()))
 else:
     pass

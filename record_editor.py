@@ -61,6 +61,7 @@ class FileLinkPopupMenu(wx.Menu):
         dlg.ShowModal()
         dlg.Destroy()
 
+
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
         #print(record_to_edit)

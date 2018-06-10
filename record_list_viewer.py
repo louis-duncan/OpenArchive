@@ -106,6 +106,7 @@ class RecordListViewer(wx.Frame):
 
         self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
         self.Bind(wx.EVT_BUTTON, self.export_csv, self.export_button)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -122,6 +123,8 @@ class RecordListViewer(wx.Frame):
         selection = self.dvc.GetSelection()
         id_of_record_to_show = self.data[int(selection.ID) - 1][0]
         record_editor.main(database_io.get_record_by_id(id_of_record_to_show))
+        record_editor.RecordEditor(self, __title__ + " - Record Viewer",
+                                   database_io.get_record_by_id(id_of_record_to_show))
 
     def export_csv(self, e, dest=None):
         if dest is None:
@@ -142,6 +145,11 @@ class RecordListViewer(wx.Frame):
                 writer.writerow(row)
         os.startfile(dlg.GetPath())
         dlg.Destroy()
+
+    def on_close(self, event):
+        print("Closed")
+        self.Destroy()
+
 
 
 def main(title, record_ids):
