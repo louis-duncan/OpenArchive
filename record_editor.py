@@ -30,7 +30,8 @@ class FileLinkPopupMenu(wx.Menu):
 
     def on_select(self, event):
         try:
-            os.startfile(self.file_path)
+            #os.startfile(self.file_path)
+            os.system(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
         except FileNotFoundError:
             dlg = wx.MessageDialog(self, "Could Not Load File!\n"
                                          "\n"
