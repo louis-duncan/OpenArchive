@@ -20,20 +20,29 @@ __title__ = "OpenArchive - Record Viewer"
 
 
 class FileLinkPopupMenu(wx.Menu):
-    def __init__(self, file_path=""):
+    def __init__(self, parent, file_path=""):
+        self.parent = parent
         wx.Menu.__init__(self)
 
         self.file_path = file_path
 
-        item = wx.MenuItem(self, wx.NewId(), "Open file in it's archive location...")
+        item = wx.MenuItem(self, wx.NewId(), "Open in archived location...")
         self.Append(item)
-        self.Bind(wx.EVT_MENU, self.on_select, item)
+        self.Bind(wx.EVT_MENU, self.on_archive_open, item)
 
-    def on_select(self, event):
+        item = wx.MenuItem(self, wx.NewId(), "Create merge request")
+        self.Append(item)
+        self.Bind(wx.EVT_MENU, self.on_create_merge, item)
+
+    def on_archive_open(self, event):
         try:
+            if os.path.exists(self.file_path):
+                pass
+            else:
+                raise FileNotFoundError
             subprocess.Popen(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
         except FileNotFoundError:
-            dlg = wx.MessageDialog(self, "Could Not Load File!\n"
+            dlg = wx.MessageDialog(self.parent, "Could Not Load File!\n"
                                          "\n"
                                          "The files could not be found at location:\n"
                                          "{}".format(self.file_path),
@@ -41,6 +50,16 @@ class FileLinkPopupMenu(wx.Menu):
             dlg.ShowModal()
             dlg.Destroy()
 
+    def on_create_merge(self, event):
+        pass
+        # Todo: Add merge request creation.
+        dlg = wx.MessageDialog(self.parent, "Inactive Feature!\n"
+                                     "\n"
+                                     "Merge requests are not currently in operation.\n"
+                                     "Please contact your database admin.",
+                               __title__)
+        dlg.ShowModal()
+        dlg.Destroy()
 
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
@@ -305,8 +324,10 @@ class RecordEditor(wx.Frame):
         else:
             # Show context menu.
             pass
+        self.file_list_box.SetSelection(right_clicked_item)
+        self.file_link_selected()
         print("Hit", right_clicked_item)
-        menu = FileLinkPopupMenu(self.temp_file_links[right_clicked_item])
+        menu = FileLinkPopupMenu(self, self.temp_file_links[right_clicked_item])
         self.file_list_box.PopupMenu(menu, pos)
         menu.Destroy()
 
@@ -710,12 +731,22 @@ class RecordEditor(wx.Frame):
         self.physical_ref_box.ChangeValue(str(self.record.physical_ref))
         self.other_ref_box.ChangeValue(str(self.record.other_ref))
         self.tags_box.ChangeValue(self.record.string_tags())
+        previous_selected_file = self.file_list_box.GetSelection()
         self.temp_file_links = []
         display_files = []
         for f in self.record.linked_files:
             self.temp_file_links.append(f)
             display_files.append(format_path_to_title(os.path.basename(f)))
         self.file_list_box.Set(display_files)
+        if len(display_files) > 0:
+            if previous_selected_file == wx.NOT_FOUND:
+                print("No file selected")
+                self.file_list_box.SetSelection(0)
+            else:
+                self.file_list_box.SetSelection(previous_selected_file)
+            self.file_link_selected()
+        else:
+            pass
         self.created_text.Label = "Created by:\n{} - {}".format(str(self.record.created_by),
                                                                 str(self.record.created_time_string()))
         self.changed_text.Label = "Last Changed:\n{} - {}".format(str(self.record.last_changed_by),
@@ -875,9 +906,9 @@ def format_path_to_title(path):
     return "({}) {}".format(e.upper(), n)
 
 
-def main(record_obj):
+def main(record_obj, title=__title__):
     app = wx.App(False)
-    frame = RecordEditor(None, __title__, record_obj)
+    frame = RecordEditor(None, title, record_obj)
     app.MainLoop()
 
 

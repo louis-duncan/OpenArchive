@@ -22,7 +22,7 @@ class LaunchPad(wx.Frame):
         # Add bg panel
         bg_panel = wx.Panel(self, size=window_size)
 
-        self.choices = ["Quick Search", "Detailed Search", "Create New Record", "View My List"]
+        self.choices = ["Detailed Search", "Create New Record", "View My List"]
         msg = """- Welcome to OpenArchive -
 
 Database File:
@@ -33,21 +33,32 @@ Archive Location:
 
         msg_lbl = wx.StaticText(bg_panel, label=msg, style=wx.ALIGN_CENTER)
 
-        button_sizer = wx.GridBagSizer(10, 10)
         button_size = (130, 40)
 
-        self.buttons = []
-        for c in self.choices:
-            self.buttons.append(wx.Button(bg_panel, size=button_size, label=c))
+        self.quick_search_box = wx.SearchCtrl(bg_panel,
+                                              size=((3 * button_size[0]) + ((len(self.choices) - 1) * 10), -1),
+                                              style=wx.TE_PROCESS_ENTER)
+        self.quick_search_box.SetDescriptiveText("Quick Search")
+        self.Bind(wx.EVT_SEARCHCTRL_SEARCH_BTN, self.on_search, self.quick_search_box)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_search, self.quick_search_box)
 
-        for i, b in enumerate(self.buttons):
-            row = i // 2
-            col = i % 2
-            button_sizer.Add(self.buttons[i], pos=(row, col))
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.buttons = []
+        for i, c in enumerate(self.choices):
+            btn = wx.Button(bg_panel, size=button_size, label=c)
+            self.buttons.append(btn)
+            button_sizer.Add(btn)
+            if i == (len(self.choices) - 1):
+                pass
+            else:
+                button_sizer.AddSpacer(10)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.AddSpacer(10)
         sizer.Add(msg_lbl, 1, wx.ALIGN_CENTER)
+        sizer.AddSpacer(20)
+        sizer.Add(self.quick_search_box, 0, wx.ALIGN_CENTER)
         sizer.AddSpacer(20)
         sizer.Add(button_sizer, 1, wx.ALIGN_CENTER)
         sizer.AddSpacer(10)
@@ -59,32 +70,29 @@ Archive Location:
 
         self.Show()
 
+    def on_search(self, event):
+        search_text = event.GetString()
+        search_text = search_text.strip()
+        print(search_text)
+        if search_text == "":
+            return None
+        else:
+            pass
+        self.quick_search(search_text)
+
     def button_pressed(self, e):
         lbl_pressed = e.GetEventObject().Label
         if lbl_pressed == self.choices[0]:
-            self.quick_search()
-        elif lbl_pressed == self.choices[1]:
             detailed_search()
-        elif lbl_pressed == self.choices[2]:
+        elif lbl_pressed == self.choices[1]:
             launch_record_viewer()
-        elif lbl_pressed == self.choices[3]:
+        elif lbl_pressed == self.choices[2]:
             access_users_list()
         else:
             pass
 
-    def quick_search(self):
-        dlg = wx.TextEntryDialog(self,
-                                 message="Enter text to search:",
-                                 caption=__title__ + " - Quick Search"
-                                 )
-        resp = dlg.ShowModal()
-        dlg.Destroy()
-        if resp == wx.ID_CANCEL:
-            print("Cancelled")
-            return None
-        else:
-            pass
-        results = database_io.search_archive(dlg.GetValue())
+    def quick_search(self, search_text):
+        results = database_io.search_archive(search_text)
         for r in results:
             print(r.id)
         record_list_viewer.main("Search Results", results)
@@ -126,7 +134,7 @@ def launch_record_viewer(r = None):
     r.record_id = "New Record"
     #print(r)
     # r = database_io.get_record_by_id(50)
-    record_editor.main(r)
+    record_editor.main(r, title=__title__ + " - New Record")
 
 
 def access_users_list():

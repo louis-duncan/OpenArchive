@@ -35,22 +35,6 @@ EPOCH = datetime.datetime(1970, 1, 1)
 
 
 class ArchiveRecord:
-##    record_id = None
-##    title = ""
-##    description = ""
-##    record_type = None
-##    local_auth = None
-##    start_date = datetime.datetime
-##    end_date = datetime.datetime
-##    tags = []
-##    physical_ref = ""
-##    other_ref = ""
-##    linked_files = []
-##    thumb_files = []
-##    created_by = ""
-##    created_time = datetime.datetime
-##    last_changed_by = ""
-##    last_changed_time = datetime.datetime
     tags_prompt = 'Enter tags comma separated. (eg. tag1, tag2,...)'
 
     # noinspection PyDefaultArgument
