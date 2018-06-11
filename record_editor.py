@@ -14,8 +14,8 @@ import PIL.Image
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import temp
 
-no_preview_file = ".\\bin\\no_thumb.jpg"
-no_locate_file = ".\\bin\\no_locate.jpg"
+no_preview_file = ".\\bin\\img\\no_thumb.jpg"
+no_locate_file = ".\\bin\\img\\no_locate.jpg"
 __title__ = "OpenArchive - Record Viewer"
 
 

@@ -1,6 +1,5 @@
 import os
 import time
-
 import easygui
 import record_list_viewer
 import database_io

@@ -17,13 +17,14 @@ __title__ = "OpenArchive"
 invalid_chars = ""
 
 # Config Path
-LOCAL_CONFIG = ".\\bin\\local_config.cfg"
-GLOBAL_CONFIG = ".\\bin\\global_config.cfg"
+LOCAL_CONFIG = os.path.join(os.environ["LOCALAPPDATA"], "OpenArchive\\local_config.cfg")
+TEMPLATE_LOCAL_CONFIG = ".\\cfg\\template_local_config.cfg"
+GLOBAL_CONFIG = ".\\cfg\\global_config.cfg"
 
 # Root path of the repo.
-ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")  # os.path.abspath(os.path.join(os.environ["ONEDRIVE"], "Test DB Location"))
+ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")
 # Path of the sql database file.
-DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))  # os.path.abspath(".\\bin\\archive.db")
+DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))
 # The sub directory in which OpenArchive will place new uploaded content.
 ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 # Directories in which files are left in place and not copied to the archive when linked.
@@ -212,28 +213,30 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 
 def load_config():
-    global LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION
+    global LOCAL_CONFIG, TEMPLATE_LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION
 
-    local_config = {"GLOBAL_CONFIG" : GLOBAL_CONFIG,
-                    "TEMP_DATA_LOCATION" : TEMP_DATA_LOCATION,
+    local_config = {"GLOBAL_CONFIG": GLOBAL_CONFIG,
+                    "TEMP_DATA_LOCATION": TEMP_DATA_LOCATION,
                     }
+
     formatted_incs = ""
     for i in ARCHIVE_INCLUDED_DIRS:
         formatted_incs += i + "|"
     formatted_incs = formatted_incs.strip("|")
-        
     global_config = {"DATABASE_LOCATION" : DATABASE_LOCATION,
                      "ARCHIVE_LOCATION_ROOT" : ARCHIVE_LOCATION_ROOT,
                      "ARCHIVE_LOCATION_SUB" : ARCHIVE_LOCATION_SUB,
                      "ARCHIVE_INCLUDED_DIRS" : formatted_incs,
                      }
+
     # Load local config
-    print("Loading local config...")
+    print("Loading local config at", LOCAL_CONFIG, "...")
     try:
         with open(LOCAL_CONFIG, "r") as file:
             local_config_lines = file.readlines()
     except FileNotFoundError:
-            local_config_lines = []
+        with open(TEMPLATE_LOCAL_CONFIG, "r") as file:
+            local_config_lines = file.readlines()
 
     for l in local_config_lines:
         v_name, v_value = l.split("=", 1)
