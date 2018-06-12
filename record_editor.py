@@ -11,11 +11,15 @@ import database_io
 import textdistance
 import PIL
 import PIL.Image
+import PIL.ImageFile
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import temp
 
-no_preview_file = ".\\bin\\img\\no_thumb.jpg"
-no_locate_file = ".\\bin\\img\\no_locate.jpg"
+PIL.ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+no_preview_thumb = os.path.abspath(".\\bin\\img\\no_preview.jpg")
+no_locate_thumb = os.path.abspath(".\\bin\\img\\no_locate.jpg")
+no_file_thumb = os.path.abspath(".\\bin\\img\\no_file.jpg")
 __title__ = "OpenArchive - Record Viewer"
 
 
@@ -26,7 +30,7 @@ class FileLinkPopupMenu(wx.Menu):
 
         self.file_path = file_path
 
-        item = wx.MenuItem(self, wx.NewId(), "Open in archived location...")
+        item = wx.MenuItem(self, wx.NewId(), "Show in archived location...")
         self.Append(item)
         self.Bind(wx.EVT_MENU, self.on_archive_open, item)
 
@@ -43,9 +47,9 @@ class FileLinkPopupMenu(wx.Menu):
             subprocess.Popen(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
         except FileNotFoundError:
             dlg = wx.MessageDialog(self.parent, "Could Not Load File!\n"
-                                         "\n"
-                                         "The files could not be found at location:\n"
-                                         "{}".format(self.file_path),
+                                                "\n"
+                                                "The files could not be found at location:\n"
+                                                "{}".format(self.file_path),
                                    "OpenArchive - File Error")
             dlg.ShowModal()
             dlg.Destroy()
@@ -54,9 +58,9 @@ class FileLinkPopupMenu(wx.Menu):
         pass
         # Todo: Add merge request creation.
         dlg = wx.MessageDialog(self.parent, "Inactive Feature!\n"
-                                     "\n"
-                                     "Merge requests are not currently in operation.\n"
-                                     "Please contact your database admin.",
+                                            "\n"
+                                            "Merge requests are not currently in operation.\n"
+                                            "Please contact your database admin.",
                                __title__)
         dlg.ShowModal()
         dlg.Destroy()
@@ -64,11 +68,12 @@ class FileLinkPopupMenu(wx.Menu):
 
 class RecordEditor(wx.Frame):
     def __init__(self, parent, title, record_to_edit: database_io.ArchiveRecord):
-        #print(record_to_edit)
+        # print(record_to_edit)
         wx.Frame.__init__(self, parent, title=title, size=(900, 500),
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
         self.record = record_to_edit
+        self.cache_dir = temp.mkdtemp(dir=database_io.TEMP_DATA_LOCATION)
 
         # Add bg panel
         bg_panel = wx.Panel(self, size=(2000, 2000))
@@ -456,6 +461,23 @@ class RecordEditor(wx.Frame):
         self.set_changed()
 
     def unlink_file(self, event):
+        explination_msg = "Files linked to records in OpenArchive can be stored in two kinds of locations. " \
+                          "Dependant on the linked file's location, it will be treated differently when unlinked:\n" \
+                          "\n" \
+                          "1. The directory managed by OpenArchive:\n" \
+                          "In this case, the file will be relocated to the desktop to prevent data loss before being " \
+                          "purged from the archive.\n" \
+                          "\n" \
+                          "2. Other predefined, non-managed, locations:\n" \
+                          "OpenArchive allows for the configuration of directories from which it will not copy files " \
+                          "when they are linked. This is to prevent duplication of pre-existing archives. When " \
+                          "unlinking a file stored in one of these locations it will not be moved or delwted when " \
+                          "unlinked.\n" \
+                          "\n" \
+                          "If you are unsure as to the location of a file which you are unlinking, and you wish to" \
+                          " know; select No from this dialog, right-click the file in question, and select " \
+                          "\'Show in archived location....\'"
+
         # Drop out if no file is selected.
         selection = self.file_list_box.GetSelection()
 
@@ -470,15 +492,47 @@ class RecordEditor(wx.Frame):
         links = database_io.get_files_links(file_to_remove)
         if (len(links) == 1) and links[0].record_id != self.record.record_id:
             # This allows the process to continue is there is only one link, but that link is from a different record.
+            # This shouldn't happen, but might occur if multiple people happen to be accessing the same record.
             pass
-        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_ROOT)):
+        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_SUB)):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
+            dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
+                                             "\n"
+                                             "This is the only record which links to this file in the archive.\n"
+                                             "If you choose to to unlink the file, it will be copied to your desktop\n"
+                                             "to prevent it being lost.",
+                                       style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
+            dlg.ShowDetailedText(explination_msg)
+            resp = dlg.ShowModal()
+            if resp == wx.ID_NO:
+                print("Pressed No")
+                return None
+            else:
+                pass
+        elif ((len(links) <= 1) and database_io.check_if_in_archive(file_to_remove)) \
+                and not (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_SUB)):
+            #  Raise message, and if continued, create copy, unlink, and remove from repo
+            dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
+                                             "\n"
+                                             "This is the only record which links to this file in the archive.\n"
+                                             "This file is located in a directory not managed by OpenArchive.\n"
+                                             "Please ensure you are satisfied that you know the location of the file\n"
+                                             "for future reference. See below for details.",
+                                       style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
+            dlg.ShowDetailedText(explination_msg)
+            resp = dlg.ShowModal()
+            if resp == wx.ID_NO:
+                print("Pressed No")
+                return None
+            else:
+                pass
+        elif os.path.basename(file_to_remove).startswith("OA_PDF_Merge_"):
+            # Raise msg about removing staged file
             dlg = wx.MessageDialog(self, "Are you sure you want to unlink this file?\n"
                                          "\n"
-                                         "This is the only record which links to this file in the archive.\n"
-                                         "If you choose to to unlink the file, it will be copied to your desktop\n"
-                                         "to prevent it being lost.",
-                                   style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
+                                         "This is a merged file. If you choose to unlink it you will need to\n"
+                                         "repeat the merging process if you decide to re-link.",
+                                   style=wx.YES_NO | wx.ICON_INFORMATION | wx.NO_DEFAULT)
             resp = dlg.ShowModal()
             if resp == wx.ID_NO:
                 print("Pressed No")
@@ -490,6 +544,12 @@ class RecordEditor(wx.Frame):
 
         # remove link.
         print("Removing {}!".format(file_to_remove))
+        if file_to_remove.startswith(self.cache_dir):
+            print("Deleting {} for Temp Location.".format(file_to_remove))
+            try:
+                os.remove(file_to_remove)
+            except FileNotFoundError:
+                print("Already Gone!")
         self.temp_file_links.remove(file_to_remove)
         self.file_list_box.Delete(self.file_list_box.GetSelection())
         self.set_changed()
@@ -527,6 +587,12 @@ class RecordEditor(wx.Frame):
         else:
             pass
         self.Destroy()
+
+        self.previewer.LoadFile(no_file_thumb)
+        # Purge any files held in the cache for this record.
+        for f in os.listdir(self.cache_dir):
+            os.remove(os.path.join(self.cache_dir, f))
+        os.rmdir(self.cache_dir)
 
     def set_changed(self, event=None):
         self.unsaved_changes = False
@@ -624,17 +690,18 @@ class RecordEditor(wx.Frame):
                     self.previewer.LoadFile(path)
                 except RuntimeError:
                     print("Tried to load a bad file type!")
-                    self.previewer.LoadFile(no_preview_file)
+                    self.previewer.LoadFile(no_preview_thumb)
             else:
-                self.previewer.LoadFile(no_preview_file)
+                self.previewer.LoadFile(no_preview_thumb)
         else:
-            self.previewer.LoadFile(no_locate_file)
+            self.previewer.LoadFile(no_locate_thumb)
         self.remove_file_button.Enable()
 
     def file_link_double_clicked(self, event):
         dlg = LoadingDialog(self)
         dlg.Show(True)
-        suc = self.record.launch_file(file_path=self.temp_file_links[self.file_list_box.GetSelection()])
+        suc = self.record.launch_file(file_path=self.temp_file_links[self.file_list_box.GetSelection()],
+                                      cache_dir=self.cache_dir)
         if suc is True:
             dlg.Destroy()
             return None
@@ -653,13 +720,17 @@ class RecordEditor(wx.Frame):
         dlg.Destroy()
 
     def save_record(self, event=None):
+        # Blank the previewer, otherwise file become locked out due to it keeping the open.
+        self.previewer.LoadFile(no_file_thumb)
+
         if (self.record.record_id == "New Record") or (self.record.record_id == 0):
             pass
         else:
             dlg = wx.MessageDialog(self, "Are you sure you want to save changes?\n"
                                          "\n"
                                          "Saving will permanently update the record with the newly entered data.\n"
-                                         "Linked files will be uploaded, and unlinked files will be purged.", "Confirm Save",
+                                         "Linked files will be uploaded, and unlinked files will be purged.",
+                                   "Confirm Save",
                                    style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
             resp = dlg.ShowModal()
             dlg.Destroy()
@@ -768,9 +839,9 @@ class RecordEditor(wx.Frame):
 
     def link_new_file(self, event=None, new_file_path=None):
         """Links single file to the record."""
-        
+
         assert type(new_file_path) in (str, tuple, list, type(None))
-                
+
         # Select the file
         if new_file_path is None:
             file_open_dlg = wx.FileDialog(self, __title__ + " - Select File To Link",
@@ -782,14 +853,14 @@ class RecordEditor(wx.Frame):
                 new_file_path = file_open_dlg.GetPaths()
         else:
             pass
-        
+
         if type(new_file_path) == str:
             print("String Path")
             # Copy it to the cache
             if database_io.is_file_in_archive(new_file_path):
                 pass
             else:
-                new_file_path = database_io.move_file_to_cache(new_file_path)
+                new_file_path = database_io.move_file_to_cache(new_file_path, self.cache_dir)
             # Add the cached dir to the temp dir list
             self.temp_file_links.append(new_file_path)
             self.file_list_box.Append(format_path_to_title(os.path.basename(new_file_path)))
@@ -825,14 +896,14 @@ class RecordEditor(wx.Frame):
 
         # Get a name for the new file.
         t = datetime.datetime.fromtimestamp(time.time())
-        new_file_name = "PDF Merge {}{}{}{}{}{}.pdf".format(str(t.year)[2:4],
-                                                            str(t.month).zfill(2),
-                                                            str(t.day).zfill(2),
-                                                            str(t.hour).zfill(2),
-                                                            str(t.minute).zfill(2),
-                                                            str(t.second).zfill(2)
-                                                            )
-        new_file_path = os.path.join(database_io.TEMP_DATA_LOCATION, new_file_name)
+        new_file_name = "OA_PDF_Merge_{}{}{}{}{}{}.pdf".format(str(t.year)[2:4],
+                                                               str(t.month).zfill(2),
+                                                               str(t.day).zfill(2),
+                                                               str(t.hour).zfill(2),
+                                                               str(t.minute).zfill(2),
+                                                               str(t.second).zfill(2)
+                                                               )
+        new_file_path = os.path.join(self.cache_dir, new_file_name)
         loading_dlg = wx.ProgressDialog("Merge Files", "Merging files...", len(file_paths))
         loading_dlg.ShowModal()
         suc = True
@@ -851,10 +922,19 @@ class RecordEditor(wx.Frame):
                         output.addPage(input.getPage(i))
 
                 else:  # input_file isn't pdf ex. jpeg, png
+                    # Copy the file locally, this makes sure that the file is formatted correctly for the PDF save.
                     im = PIL.Image.open(input_file)
-                    fd, input_file_pdf = temp.mkstemp(dir=os.environ["TEMP"])
+                    fd, local_image_file = temp.mkstemp(prefix="OATMP", suffix=".jpg", dir=self.cache_dir)
                     os.close(fd)
-                    im.save(input_file_pdf, 'PDF', resoultion=100.0)
+                    im.save(local_image_file, 'JPEG', resolution=100.0)
+                    im.close()
+
+                    # Now save it to PDF and delete the temp image.
+                    im = PIL.Image.open(local_image_file)
+                    fd, input_file_pdf = temp.mkstemp(prefix="OATMP", suffix=".pdf", dir=self.cache_dir)
+                    os.close(fd)
+                    im.save(input_file_pdf, 'PDF', resolution=100.0)
+                    os.remove(local_image_file)
 
                     fh = open(input_file_pdf, 'rb')
                     part_files_handles.append([fh, True])
@@ -873,6 +953,8 @@ class RecordEditor(wx.Frame):
                 f[0].close()  # Close each file.
                 if f[1]:
                     os.remove(part_path)  # If 'created' flag is True, remove file a it was created in this process.
+            outputStream.close()
+
         except Exception as ex:
             suc = False
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -882,7 +964,7 @@ class RecordEditor(wx.Frame):
         loading_dlg.Destroy()
 
         if suc is False:
-            dlg = wx.MessageDialog(self, "Could not merge the files!", "Error")
+            dlg = wx.MessageDialog(self, "Could not merge the files!\n\n{}".format(message), "Error")
             dlg.ShowModal()
             dlg.Destroy()
         else:

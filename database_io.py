@@ -94,7 +94,7 @@ class ArchiveRecord:
                                                                                                                                           self.string_tags(),
                                                                                                                                           )
 
-    def launch_file(self, file_index=0, file_path=None):
+    def launch_file(self, file_index=0, file_path=None, cache_dir=TEMP_DATA_LOCATION):
         if (self.linked_files is None) and (file_path is None):
             pass
         else:
@@ -111,7 +111,7 @@ class ArchiveRecord:
                     in_archive = check_if_in_archive(path)
                     if in_archive:
                         file_extension = path.split(".")[-1]
-                        fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", TEMP_DATA_LOCATION)
+                        fd, cached_path = temp.mkstemp("." + file_extension, "OATEMP_", cache_dir)
                         os.close(fd)
                         shutil.copy2(path, cached_path)
                         path = cached_path
@@ -314,6 +314,20 @@ def load_config():
         for v in global_config:
             lines.append("{} = {}\n".format(v, global_config[v]))
         file.writelines(lines)
+
+    print("Local Config: {}\n"
+          "Global Config: {}\n"
+          "Local Temp Files: {}\n"
+          "Database File Location: {}\n"
+          "Repos. Locations: {}\n"
+          "Repos. Sub. Loc.: {}\n"
+          "Other Repo. Dirs.: {}".format(LOCAL_CONFIG,
+                                         GLOBAL_CONFIG,
+                                         TEMP_DATA_LOCATION,
+                                         DATABASE_LOCATION,
+                                         ARCHIVE_LOCATION_ROOT,
+                                         ARCHIVE_LOCATION_SUB,
+                                         ARCHIVE_INCLUDED_DIRS))
         
   
 def create_new_database():
@@ -619,29 +633,30 @@ def format_search_string(search_string):
 
 def clear_cache():
     temp_files = os.listdir(TEMP_DATA_LOCATION)
-    print("Clearing {} files from:\n{}".format(len(temp_files), TEMP_DATA_LOCATION))
+    print("{} files in:\n{}".format(len(temp_files), TEMP_DATA_LOCATION))
     fails = []
     for f in temp_files:
         full_f = os.path.join(TEMP_DATA_LOCATION, f)
+        remove = False
 
-        try:
-            if full_f.endswith('.dat'):
-                try:
-                    data = access_bin_file(full_f)
-                    if data is False:
-                        os.remove(full_f)
-                    elif data.unsaved_changes:
-                        pass
-                    else:
-                        os.remove(full_f)
-                except AttributeError or EOFError:
-                    os.remove(full_f)
-            else:
-                os.remove(full_f)
-        except PermissionError:
-            fails.append(full_f)
-        except FileNotFoundError:
+        if os.path.basename(f).startswith("OA"):
+            remove = True
+        else:
             pass
+
+        if remove:
+            print("Purging {}... ".format(f), end="")
+            try:
+                os.remove(full_f)
+                print("success")
+            except PermissionError:
+                fails.append(full_f)
+                print("fail")
+            except FileNotFoundError:
+                print("not found")
+        else:
+            print("Skipping {}... ".format(f))
+
     return fails
 
 
@@ -654,7 +669,7 @@ def create_cached_record(record_id=None):
     if record_obj is None:
         return None
     else:
-        fd, record_object_path = temp.mkstemp(".dat", "OATEMP_", TEMP_DATA_LOCATION)
+        fd, record_object_path = temp.mkstemp(".dat", "OATMP", TEMP_DATA_LOCATION)
         os.close(fd)
         save_bin_file(record_object_path, record_obj)
         return record_object_path
@@ -671,7 +686,6 @@ def check_if_in_archive(path):
         print(r)
         if os.path.commonpath((path, r)) == r:
             in_archive = True
-            print("In here!")
             break
         else:
             pass
@@ -736,7 +750,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         # The remaining files in the submitted list are new links, so deal with them.
         for f in files_to_link:
             link_f = os.path.abspath(f)
-            if check_if_in_archive(link_f): # If file in archive, re-link.
+            if check_if_in_archive(link_f): # If file in archive, no need to copy it in.
                 pass
             else: # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
@@ -749,20 +763,47 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                 # Check is truly dead
                 hope = bliss.all("SELECT * FROM file_links WHERE file_path=?", (link.file_path,))
                 if len(hope) <= 1:
-                    # No hope for this link!
-                    print("Purging {}!".format(link.file_path))
-                    desktop = os.path.join(os.environ["USERPROFILE"], "Desktop")
-                    shutil.copy2(link.file_path, desktop)
-                    try:
-                        os.remove(link.file_path)
-                        os.rmdir(os.path.dirname(link.file_path))
-                    except PermissionError:
-                        print("PermissionError: Could not delete {}!".format(link.file_path))
-                    except OSError:
-                        print("OSError: Could not delete {}!".format(os.path.dirname(link.file_path)))
-                    bliss.run("DELETE FROM file_links WHERE id=?", (link.id,))
+                    if (len(hope) == 1) and (int(hope[0].record_id) != int(record_obj.record_id)):
+                        print("")
+                        # Hope is re-kindled...
+                        # This record is linked to another file!
+                        # So leave it in place.
+                        print("Hope re-kindled for link between "
+                              "{} and {}.".format(record_obj.record_id, link.file_path))
+                        pass
+                    else:
+                        # No hope for this link!
+                        print("Purging {}!".format(link.file_path))
+
+                        # Check if the file we're un-linking is in the dir managed by OpenArchive.
+                        # If so, copy it to the desktop.
+                        in_sub = os.path.commonpath((link.file_path, ARCHIVE_LOCATION_SUB)) == ARCHIVE_LOCATION_SUB
+
+                        suc = True
+                        if in_sub:
+                            desktop = os.path.join(os.environ["USERPROFILE"], "Desktop")
+                            shutil.copy2(link.file_path, desktop)
+                            try:
+                                os.remove(link.file_path)
+                                os.rmdir(os.path.dirname(link.file_path))
+                            except PermissionError:
+                                suc = False
+                                print("PermissionError: Could not delete {}!".format(link.file_path))
+                            except OSError:
+                                suc = False
+                                print("OSError: Could not delete {}!".format(os.path.dirname(link.file_path)))
+                        else:
+                            # Leave it where it is.
+                            print("Leaving {} in place, as it is not in the directory managed by OA."
+                                  .format(link.file_path))
+
+                        # Finally, remove the actual link as long as the file was successfuly deleted.
+                        if suc:
+                            bliss.run("DELETE FROM file_links WHERE id=?", (link.id,))
+
                 else:
-                    # Just enough hope, so the record stays.
+                    print("Just enough hope to save the link between"
+                          "{} and {}.".format(record_obj.record_id, link.file_path))
                     pass
             else:
                 pass
@@ -798,7 +839,9 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
 def move_file_to_archive(cached_path=""):
     new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
     new_full_path = os.path.abspath(os.path.join(new_root, os.path.basename(cached_path)))
-    return shutil.copy2(cached_path, new_full_path)
+    suc = shutil.copy2(cached_path, new_full_path)
+    os.remove(cached_path)
+    return suc
 
 
 def score_results(results, text):
@@ -888,11 +931,13 @@ def add_new_local_authority(local_auth_string):
     conn.commit()
 
 
-def move_file_to_cache(new_file_path):
-    if os.path.abspath(TEMP_DATA_LOCATION) == os.path.commonpath((TEMP_DATA_LOCATION, new_file_path)):
+def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
+    assert cache_dir.startswith(TEMP_DATA_LOCATION)
+
+    if os.path.abspath(cache_dir) == os.path.commonpath((cache_dir, new_file_path)):
         return os.path.abspath(new_file_path)
     else:
-        return shutil.copy2(new_file_path, TEMP_DATA_LOCATION)
+        return shutil.copy2(new_file_path, cache_dir)
 
 
 def add_bookmark(user_name, record_id):
