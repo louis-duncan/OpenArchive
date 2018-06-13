@@ -28,7 +28,7 @@ Database File:
 {}
 
 Archive Location:
-{}""".format(database_io.DATABASE_LOCATION, database_io.ARCHIVE_LOCATION_ROOT)
+{}""".format(database_io.DATABASE_LOCATION.replace("&", "&&"), database_io.ARCHIVE_LOCATION_ROOT.replace("&", "&&"))
 
         msg_lbl = wx.StaticText(bg_panel, label=msg, style=wx.ALIGN_CENTER)
 
