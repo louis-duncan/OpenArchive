@@ -23,9 +23,9 @@ class RecordListViewer(wx.Frame):
 
         headings = (("ID:", 35),
                     ("Title:", 250),
-                    ("Description:", 400),
-                    ("Type:", 250),
-                    ("Local Auth:", 150),
+                    ("Description:", 450),
+                    ("Type:", 175),
+                    ("Source/Local Auth.:", 175),
                     ("Date Period:", 150),
                     ("Tags:", 200)
                     )

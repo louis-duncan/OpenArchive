@@ -100,7 +100,7 @@ class RecordEditor(wx.Frame):
         column_one.Add(self.desc_box, pos=(3, 2), span=(1, 4))
 
         # Add Type Selection
-        type_lbl = wx.StaticText(bg_panel, label="Resource Type*:")
+        type_lbl = wx.StaticText(bg_panel, label="Resource Type:")
         column_one.Add(type_lbl, (4, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         types = database_io.return_types()
         types.sort(key=database_io.float_none_drop_other)
@@ -110,15 +110,14 @@ class RecordEditor(wx.Frame):
         column_one.Add(self.type_comb, pos=(4, 2), span=(1, 4))
 
         # Add Local Authority Selection
-        local_authorities_lbl = wx.StaticText(bg_panel, label="Local Authority*:")
+        local_authorities_lbl = wx.StaticText(bg_panel, label="Source/Local Authority:")
         column_one.Add(local_authorities_lbl, (5, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         local_authorities = database_io.return_local_authorities()
         local_authorities.sort(key=database_io.float_none_drop_other)
         local_authorities.append("Add New...")
         self.local_authorities_comb = wx.ComboBox(bg_panel, size=(350, -1), choices=local_authorities,
                                                   value=str(self.record.local_auth),
-                                                  style=wx.CB_DROPDOWN | wx.CB_READONLY,
-                                                  name="Click to choose Local Authority")
+                                                  style=wx.CB_DROPDOWN | wx.CB_READONLY)
         column_one.Add(self.local_authorities_comb, pos=(5, 2), span=(1, 4))
 
         # Add date selectors
@@ -242,7 +241,7 @@ class RecordEditor(wx.Frame):
         previewer_lbl = wx.StaticText(bg_panel, label="Preview:")
         column_three.Add(previewer_lbl, (1, 1))
         self.previewer = pdfViewer(bg_panel, wx.NewId(), wx.DefaultPosition, (315, 315),
-                                   style=wx.HSCROLL | wx.VSCROLL | wx.SUNKEN_BORDER)
+                                   style=wx.HSCROLL | wx.VSCROLL | wx.BORDER_SIMPLE) # | wx.SUNKEN_BORDER)
         self.previewer.ShowLoadProgress = True
         column_three.Add(self.previewer, (2, 1), flag=wx.EXPAND)
 
@@ -397,8 +396,8 @@ class RecordEditor(wx.Frame):
             new_local_auth = ""
             while valid is not True:
                 # Get new type.
-                msg = "Enter new local authority:"
-                input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Local Authority")
+                msg = "Enter new Source/Local Authority:"
+                input_dlg = wx.TextEntryDialog(self, msg, __title__ + " - New Source")
                 input_dlg.SetValue(new_local_auth)
                 if (input_dlg.ShowModal() == wx.ID_OK) and (input_dlg.GetValue().strip() != ""):
                     new_local_auth = input_dlg.GetValue().strip()
@@ -421,7 +420,7 @@ class RecordEditor(wx.Frame):
             try:
                 database_io.add_new_local_authority(new_local_auth)
             except sqlite3.IntegrityError:
-                error_dlg = wx.MessageDialog(self, "A local authority of this name already exists!",
+                error_dlg = wx.MessageDialog(self, "A Source or Local Authority of this name already exists!",
                                              "Error", style=wx.ICON_ERROR)
                 error_dlg.ShowModal()
                 error_dlg.Destroy()
@@ -461,7 +460,7 @@ class RecordEditor(wx.Frame):
         self.set_changed()
 
     def unlink_file(self, event):
-        explination_msg = "Files linked to records in OpenArchive can be stored in two kinds of locations. " \
+        explanation_msg = "Files linked to records in OpenArchive can be stored in two kinds of locations. " \
                           "Dependant on the linked file's location, it will be treated differently when unlinked:\n" \
                           "\n" \
                           "1. The directory managed by OpenArchive:\n" \
@@ -494,7 +493,7 @@ class RecordEditor(wx.Frame):
             # This allows the process to continue is there is only one link, but that link is from a different record.
             # This shouldn't happen, but might occur if multiple people happen to be accessing the same record.
             pass
-        elif (len(links) <= 1) and (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_SUB)):
+        elif (len(links) <= 1) and database_io.is_file_in_dir(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
             dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
                                              "\n"
@@ -502,7 +501,7 @@ class RecordEditor(wx.Frame):
                                              "If you choose to to unlink the file, it will be copied to your desktop\n"
                                              "to prevent it being lost.",
                                        style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
-            dlg.ShowDetailedText(explination_msg)
+            dlg.ShowDetailedText(explanation_msg)
             resp = dlg.ShowModal()
             if resp == wx.ID_NO:
                 print("Pressed No")
@@ -510,7 +509,7 @@ class RecordEditor(wx.Frame):
             else:
                 pass
         elif ((len(links) <= 1) and database_io.check_if_in_archive(file_to_remove)) \
-                and not (file_to_remove.startswith(database_io.ARCHIVE_LOCATION_SUB)):
+                and not database_io.is_file_in_dir(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
             dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
                                              "\n"
@@ -519,7 +518,7 @@ class RecordEditor(wx.Frame):
                                              "Please ensure you are satisfied that you know the location of the file\n"
                                              "for future reference. See below for details.",
                                        style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
-            dlg.ShowDetailedText(explination_msg)
+            dlg.ShowDetailedText(explanation_msg)
             resp = dlg.ShowModal()
             if resp == wx.ID_NO:
                 print("Pressed No")
@@ -544,7 +543,7 @@ class RecordEditor(wx.Frame):
 
         # remove link.
         print("Removing {}!".format(file_to_remove))
-        if file_to_remove.startswith(self.cache_dir):
+        if database_io.is_file_in_dir(file_to_remove, self.cache_dir):
             print("Deleting {} for Temp Location.".format(file_to_remove))
             try:
                 os.remove(file_to_remove)
@@ -698,7 +697,7 @@ class RecordEditor(wx.Frame):
         self.remove_file_button.Enable()
 
     def file_link_double_clicked(self, event):
-        dlg = LoadingDialog(self)
+        dlg = LoadingDialog(self, "Loading...")
         dlg.Show(True)
         suc = self.record.launch_file(file_path=self.temp_file_links[self.file_list_box.GetSelection()],
                                       cache_dir=self.cache_dir)
@@ -721,6 +720,10 @@ class RecordEditor(wx.Frame):
 
     def save_record(self, event=None):
         # Blank the previewer, otherwise file become locked out due to it keeping the open.
+
+        dlg = LoadingDialog(self, "Saving...")
+        dlg.Show(True)
+
         self.previewer.LoadFile(no_file_thumb)
 
         if (self.record.record_id == "New Record") or (self.record.record_id == 0):
@@ -790,6 +793,9 @@ class RecordEditor(wx.Frame):
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
+
+        dlg.Destroy()
+
         return True
 
     def refresh_all(self):
@@ -907,6 +913,7 @@ class RecordEditor(wx.Frame):
         loading_dlg = wx.ProgressDialog("Merge Files", "Merging files...", len(file_paths))
         loading_dlg.ShowModal()
         suc = True
+        message = ""
         try:
             output = PdfFileWriter()
             part_files_handles = []  # [fh, created=True/False]
@@ -973,10 +980,10 @@ class RecordEditor(wx.Frame):
 
 class LoadingDialog(wx.lib.sized_controls.SizedDialog):
 
-    def __init__(self, *args, **kwargs):
-        super(LoadingDialog, self).__init__(title="Loading...", style=wx.STAY_ON_TOP | wx.CAPTION, *args, **kwargs)
+    def __init__(self, text, *args, **kwargs):
+        super(LoadingDialog, self).__init__(title=text, style=wx.STAY_ON_TOP | wx.CAPTION, *args, **kwargs)
         pane = self.GetContentsPane()
-
+        # Todo: Fix this.
         self.loading_bar = wx.Gauge(pane, -1, 75, (110, 95), (250, -1))
 
         self.Fit()

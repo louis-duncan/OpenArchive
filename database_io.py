@@ -684,7 +684,7 @@ def check_if_in_archive(path):
     in_archive = False
     for r in roots_to_check:
         print(r)
-        if os.path.commonpath((path, r)) == r:
+        if is_file_in_dir(path, r):
             in_archive = True
             break
         else:
@@ -777,7 +777,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
                         # Check if the file we're un-linking is in the dir managed by OpenArchive.
                         # If so, copy it to the desktop.
-                        in_sub = os.path.commonpath((link.file_path, ARCHIVE_LOCATION_SUB)) == ARCHIVE_LOCATION_SUB
+                        in_sub = is_file_in_dir(ARCHIVE_LOCATION_SUB, link.file_path)
 
                         suc = True
                         if in_sub:
@@ -934,7 +934,7 @@ def add_new_local_authority(local_auth_string):
 def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
     assert cache_dir.startswith(TEMP_DATA_LOCATION)
 
-    if os.path.abspath(cache_dir) == os.path.commonpath((cache_dir, new_file_path)):
+    if is_file_in_dir(new_file_path, cache_dir):
         return os.path.abspath(new_file_path)
     else:
         return shutil.copy2(new_file_path, cache_dir)
@@ -966,6 +966,15 @@ def get_user_bookmarks(user_name=None):
 def get_files_links(file_path):
     return bliss.all("SELECT * FROM main.file_links WHERE file_path=?", (file_path,))
 
+
+def is_file_in_dir(path, dir):
+    in_dir = False
+    try:
+        in_dir = os.path.abspath(dir) == os.path.commonpath((dir, path))
+    except ValueError:
+        pass
+
+    return in_dir
 
 def is_file_in_archive(file_path):
     in_archive = False
