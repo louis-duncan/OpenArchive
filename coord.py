@@ -1,4 +1,5 @@
 def coord_to_nesw(lon, lat):
+    """Converts lon/lat to 1°2'3" E 1°2'3" N"""
     # Lon
     lon_dir = "E"
     if lon < 0:
@@ -22,7 +23,7 @@ def coord_to_nesw(lon, lat):
     rem = (lat - lat_degs) * 60
     lat_mins = int(rem)
     lat_secs = (rem - lat_mins) * 60
-    full_lat = "{:0>2.0f}°{:0>2.0f}'{:0>7.4f}\"{}".format(lat_degs,
+    full_lat = "{:0>2.0f}°{:0>2.0f}'{:0>5.2f}\"{}".format(lat_degs,
                                                           lat_mins,
                                                           lat_secs,
                                                           lat_dir,
@@ -31,7 +32,10 @@ def coord_to_nesw(lon, lat):
 
 
 def nesw_to_coord(nesw):
-    nesw = nesw.replace(" ", "")
+    """Converts 1°2'3" E 1°2'3" N to lon/lat"""
+    chars_to_remove = (" ", ",", ":", ";", "-", "&", "/", "\\")
+    for c in chars_to_remove:
+        nesw = nesw.replace(c, "")
     N = ""
     E = ""
     S = ""
@@ -83,6 +87,38 @@ def nesw_to_coord(nesw):
         pass
 
     return lon, lat
+
+
+def normalise(text: str):
+    """Detect if nesw or coord and produce coord"""
+    chars_to_catch = ("N", "E", "S", "W", "°", "'", '"')
+    is_nesw = False
+    for c in chars_to_catch:
+        if c in text.upper():
+            is_nesw = True
+            break
+        else:
+            pass
+
+    if is_nesw:
+        lon, lat = nesw_to_coord(text)
+    else:
+        lon, lat = text.split(",")
+        lon = float(lon.strip())
+        lat = float(lat.strip())
+
+    return lon, lat
+
+
+def validate(text: str):
+    try:
+        lon, lat = normalise(text)
+        return True
+    except ValueError:
+        print("ValueError in coord check.")
+    except AssertionError:
+        print("Assertion Error in coord check")
+    return False
 
 
 def multi_split(text, seps=(",",)):
