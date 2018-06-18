@@ -1,12 +1,16 @@
 import datetime
 import sqlite3
 import time
+import webbrowser
+
 import wx
 import wx.adv
 from wx.lib import sized_controls
 from wx.lib.pdfviewer import pdfViewer
 import os
 import subprocess
+
+import coord
 import database_io
 import textdistance
 import PIL
@@ -14,6 +18,10 @@ import PIL.Image
 import PIL.ImageFile
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import temp
+
+import kml_load
+
+MAP_MODE="GOOGLE EARTH"
 
 PIL.ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -64,6 +72,20 @@ class FileLinkPopupMenu(wx.Menu):
                                __title__)
         dlg.ShowModal()
         dlg.Destroy()
+
+
+class LoadingDialog(wx.lib.sized_controls.SizedDialog):
+    def __init__(self, parent, text="", *args, **kwargs):
+        super(LoadingDialog, self).__init__(parent=parent,
+                                            title=text,
+                                            style=wx.STAY_ON_TOP | wx.CAPTION, *args, **kwargs)
+        pane = self.GetContentsPane()
+
+        self.loading_bar = wx.Gauge(pane, -1, 75, (110, 95), (250, -1))
+
+        self.Fit()
+
+        self.loading_bar.Pulse()
 
 
 class RecordEditor(wx.Frame):
@@ -131,6 +153,7 @@ class RecordEditor(wx.Frame):
                                    self.record.start_date.month - 1,  # Because for some reason the months start at 0.
                                    self.record.start_date.year)
             self.start_date_picker.SetValue(start_dt)
+        self.start_date_picker.SetToolTip(wx.ToolTip("Earliest relevant date."))
         column_one.Add(self.start_date_picker, pos=(6, 2))
 
         column_one.Add((27, -1), pos=(6, 3))  # Gap
@@ -145,6 +168,7 @@ class RecordEditor(wx.Frame):
                                  self.record.end_date.month - 1,  # Because for some reason the months start at 0.
                                  self.record.end_date.year)
             self.end_date_picker.SetValue(end_dt)
+        self.end_date_picker.SetToolTip(wx.ToolTip("Latest relevant date."))
         column_one.Add(self.end_date_picker, pos=(6, 5))
 
         # Add Physical and Other Refs
@@ -153,6 +177,7 @@ class RecordEditor(wx.Frame):
         self.physical_ref_box = wx.TextCtrl(bg_panel, size=(120, -1))
         if self.record.physical_ref is not None:
             self.physical_ref_box.SetValue(self.record.physical_ref)
+        self.physical_ref_box.SetToolTip(wx.ToolTip("Reference or Serial Number for physical copy."))
         column_one.Add(self.physical_ref_box, (7, 2))
 
         other_ref_lbl = wx.StaticText(bg_panel, label="Other Ref:")
@@ -160,6 +185,7 @@ class RecordEditor(wx.Frame):
         self.other_ref_box = wx.TextCtrl(bg_panel, size=(120, -1))
         if self.record.other_ref is not None:
             self.other_ref_box.SetValue(self.record.other_ref)
+        self.other_ref_box.SetToolTip(wx.ToolTip("Any other reference or serial number."))
         column_one.Add(self.other_ref_box, (7, 5))
 
         # Add Tags Box
@@ -169,6 +195,25 @@ class RecordEditor(wx.Frame):
         self.tags_box.ShowSearchButton(False)
         self.tags_box.SetDescriptiveText('Enter tags comma separated. (eg. tag1, tag2,...)')
         column_one.Add(self.tags_box, pos=(8, 2), span=(1, 4))
+
+        # Lon/Lat Boxes
+        lon_lat_lbl = wx.StaticText(bg_panel, label="Longitude/Latitude:")
+        column_one.Add(lon_lat_lbl, (9, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        self.lon_lat_box = wx.SearchCtrl(bg_panel, size=(220, -1))
+        self.lon_lat_box.ShowSearchButton(False)
+        self.lon_lat_box.SetDescriptiveText('Enter longitude/latitude...')
+        coord_msg = """Lon/Lat can be formatted as either:
+Lon, Lat (eg. -3.14159, 26.53589), or
+Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
+        lon_lat_tool_tip = wx.ToolTip(coord_msg)
+        lon_lat_tool_tip.SetDelay(1000)
+        lon_lat_tool_tip.SetAutoPop(20000)
+        self.lon_lat_box.SetToolTip(lon_lat_tool_tip)
+        column_one.Add(self.lon_lat_box, pos=(9, 2), span=(1, 3))
+
+        # Pin view button
+        self.lon_lat_view_button = wx.Button(bg_panel, size=(120, 23), label="View in Google Earth")
+        column_one.Add(self.lon_lat_view_button, pos=(9, 5))
 
         # New Column!
         column_two = wx.GridBagSizer(vgap=10, hgap=10)
@@ -189,9 +234,12 @@ class RecordEditor(wx.Frame):
         # File Buttons
         file_buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.upload_single_button = wx.Button(bg_panel, size=(100, -1), label="Upload\nSingle File(s)")
+        self.upload_single_button.SetToolTip(wx.ToolTip("Links one or many files to the record as individual entries."))
         file_buttons_sizer.Add(self.upload_single_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.upload_multiple_button = wx.Button(bg_panel, size=(100, -1), label="Upload Many\nAs One PDF")
+        self.upload_multiple_button.SetToolTip(wx.ToolTip("Merges multiple image files into a single PDF file\n"
+                                                          "then links it to the record as a single entry."))
         file_buttons_sizer.Add(self.upload_multiple_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
@@ -240,13 +288,14 @@ class RecordEditor(wx.Frame):
         # Previewer
         previewer_lbl = wx.StaticText(bg_panel, label="Preview:")
         column_three.Add(previewer_lbl, (1, 1))
-        self.previewer = pdfViewer(bg_panel, wx.NewId(), wx.DefaultPosition, (315, 315),
-                                   style=wx.HSCROLL | wx.VSCROLL | wx.BORDER_SIMPLE) # | wx.SUNKEN_BORDER)
+        self.previewer = pdfViewer(bg_panel, wx.NewId(), wx.DefaultPosition, (348, 348),
+                                   style=wx.HSCROLL | wx.VSCROLL | wx.BORDER_SIMPLE)  # | wx.SUNKEN_BORDER)
         self.previewer.ShowLoadProgress = True
         column_three.Add(self.previewer, (2, 1), flag=wx.EXPAND)
 
         # Previewed file name.
-        self.previewer_file_name_lbl = wx.StaticText(bg_panel, label="#############################################",
+        self.previewer_file_name_lbl = wx.StaticText(bg_panel,
+                                                     label="#################################################",
                                                      style=wx.ALIGN_RIGHT | wx.ST_ELLIPSIZE_MIDDLE)
         self.previewer_file_name_lbl.SetLabel("")
         column_three.Add(self.previewer_file_name_lbl, (3, 1))
@@ -286,6 +335,10 @@ class RecordEditor(wx.Frame):
         self.Bind(wx.EVT_TEXT, self.update_physical_ref, self.physical_ref_box)
         self.Bind(wx.EVT_TEXT, self.update_other_ref, self.other_ref_box)
         self.Bind(wx.EVT_TEXT, self.update_tags, self.tags_box)
+        self.Bind(wx.EVT_TEXT, self.update_location, self.lon_lat_box)
+
+        # Location View Button Bind
+        self.Bind(wx.EVT_BUTTON, self.open_location_pinpoint, self.lon_lat_view_button)
 
         # File Link Box
         self.Bind(wx.EVT_LISTBOX, self.file_link_selected, self.file_list_box)
@@ -458,6 +511,25 @@ class RecordEditor(wx.Frame):
         else:
             pass
         self.set_changed()
+
+    def update_location(self, event):
+        self.set_changed()
+
+    def open_location_pinpoint(self, event):
+        if self.lon_lat_box.GetValue().strip() == "":
+            return None
+        assert coord.validate(self.lon_lat_box.GetValue().strip()) is True
+        if MAP_MODE.upper() == "GOOGLE EARTH":
+            lon, lat = coord.normalise(self.lon_lat_box.GetValue().strip())
+            kml_load.create_kml_point(self.title_box.GetValue().strip(),
+                                      self.desc_box.GetValue().strip(),
+                                      lon,
+                                      lat,
+                                      self.cache_dir)
+        else:
+            lon, lat = coord.normalise(self.lon_lat_box.GetValue().strip())
+            url = "https://www.google.com/maps/?q={},{}".format(lat, lon)
+            webbrowser.open_new_tab(url)
 
     def unlink_file(self, event):
         explanation_msg = "Files linked to records in OpenArchive can be stored in two kinds of locations. " \
@@ -657,6 +729,9 @@ class RecordEditor(wx.Frame):
                     print("Tags Changed -", t.upper().strip(), str(self.record.tags))
                     break
 
+        # Lon/Lat Box
+        # Todo: Add check for changes to this box
+
         # Files
         if len(self.temp_file_links) != len(self.record.linked_files):
             self.unsaved_changes = True
@@ -673,11 +748,23 @@ class RecordEditor(wx.Frame):
         else:
             self.save_button.Disable()
 
+        # Update buttons
+        # Unlink button
         self.remove_file_button.Disable()
         if len(self.temp_file_links) > 0:
             self.remove_file_button.Enable()
         else:
             pass
+        # Lon/Lat View button
+        if coord.validate(self.lon_lat_box.GetValue().strip()) is True:
+            self.lon_lat_view_button.Enable()
+            if MAP_MODE.upper() == "GOOGLE EARTH":
+                self.lon_lat_view_button.SetLabel("View in Google Earth")
+            else:
+                self.lon_lat_view_button.SetLabel("View in Google Maps")
+        else:
+            self.lon_lat_view_button.Disable()
+            self.lon_lat_view_button.SetLabel("Invalid Location")
 
     def file_link_selected(self, event=None):
         path = self.temp_file_links[self.file_list_box.GetSelection()]
@@ -720,9 +807,6 @@ class RecordEditor(wx.Frame):
 
     def save_record(self, event=None):
         # Blank the previewer, otherwise file become locked out due to it keeping the open.
-
-        dlg = LoadingDialog(self, "Saving...")
-        dlg.Show(True)
 
         self.previewer.LoadFile(no_file_thumb)
 
@@ -772,6 +856,8 @@ class RecordEditor(wx.Frame):
 
         valid = database_io.check_record(new_record_obj)
         if valid is True:
+            saving_dlg = LoadingDialog(self, "Saving...")
+            saving_dlg.Show(True)
             suc = database_io.commit_record(record_obj=new_record_obj)
             if type(suc) == database_io.ArchiveRecord:
                 self.record = suc
@@ -782,6 +868,7 @@ class RecordEditor(wx.Frame):
             dlg = wx.MessageDialog(self, error_msg, style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
+            saving_dlg.Destroy()
         elif valid == "Bad Chars":
             dlg = wx.MessageDialog(self, "Record contains invalid characters!\n\nDisallowed Characters:\n{}"
                                    .format(database_io.invalid_chars),
@@ -978,19 +1065,6 @@ class RecordEditor(wx.Frame):
             self.link_new_file(new_file_path=new_file_path)
 
 
-class LoadingDialog(wx.lib.sized_controls.SizedDialog):
-
-    def __init__(self, text, *args, **kwargs):
-        super(LoadingDialog, self).__init__(title=text, style=wx.STAY_ON_TOP | wx.CAPTION, *args, **kwargs)
-        pane = self.GetContentsPane()
-        # Todo: Fix this.
-        self.loading_bar = wx.Gauge(pane, -1, 75, (110, 95), (250, -1))
-
-        self.Fit()
-
-        self.loading_bar.Pulse()
-
-
 def format_path_to_title(path):
     n, e = path.rsplit(".", 1)
     return "({}) {}".format(e.upper(), n)
@@ -1005,6 +1079,6 @@ def main(record_obj, title=__title__):
 if __name__ == "__main__":
     r = database_io.ArchiveRecord()
     r.record_id = "New Record"
-    r = database_io.get_record_by_id(82)
+    # r = database_io.get_record_by_id(82)
     main(r)
     database_io.clear_cache()
