@@ -53,6 +53,9 @@ Archive Location:
             else:
                 button_sizer.AddSpacer(10)
 
+        # Disable Detailed Search Button
+        self.buttons[0].Disable()
+
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.AddSpacer(10)
         sizer.Add(msg_lbl, 1, wx.ALIGN_CENTER)
@@ -102,6 +105,12 @@ Archive Location:
         # Perform search.
         # Display results.
         # todo: Write detailed search
+        #dlg = wx.MessageDialog(self, "Inactive Feature!\n"
+        #                                    "\n"
+        #                                    "Detailed searched are not currently in operation.",
+        #                       __title__)
+        #dlg.ShowModal()
+        #dlg.Destroy()
 
     def launch_record_editor(self):
         # Created Blank Record and loads editor.

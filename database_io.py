@@ -940,10 +940,11 @@ def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
         return shutil.copy2(new_file_path, cache_dir)
 
 
-def add_bookmark(user_name, record_id):
+def add_bookmark(user_name="", record_id=0):
     check = bliss.one("SELECT title FROM resources WHERE id=?", (record_id,))
     assert check is not None
-    user_name = os.environ["USERNAME"]
+    if user_name is None or user_name == "":
+        user_name = os.environ["USERNAME"]
     print("Bookmarking {} for {}".format(check, user_name))
     bliss.run("INSERT INTO bookmarks (user_name, record_id) VALUES (?, ?)", (user_name, record_id))
     conn.commit()
@@ -975,6 +976,7 @@ def is_file_in_dir(path, dir):
         pass
 
     return in_dir
+
 
 def is_file_in_archive(file_path):
     in_archive = False
