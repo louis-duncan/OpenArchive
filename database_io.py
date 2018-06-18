@@ -349,6 +349,8 @@ def create_new_database():
     tags VARCHAR,
     other_ref VARCHAR,
     physical_ref VARCHAR,
+    longitude FLOAT,
+    latitude FLOAT,
     created_by VARCHAR,
     created_time DATETIME,
     last_changed_by VARCHAR,
