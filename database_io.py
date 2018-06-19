@@ -41,7 +41,8 @@ class ArchiveRecord:
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
                  start_date=None, end_date=None, physical_ref="", other_ref="", new_tags=[], linked_files=[],
-                 thumb_files=[], created_by=None, created_time=None, last_changed_by=None, last_changed_time=None):
+                 longitude=0.0, latitude=0.0, thumb_files=[], created_by=None, created_time=None, last_changed_by=None,
+                 last_changed_time=None):
         self.record_id = record_id
         self.title = title
         self.description = description
@@ -53,6 +54,8 @@ class ArchiveRecord:
         self.other_ref = other_ref
         self.tags = new_tags
         self.linked_files = linked_files
+        self.longitude = longitude
+        self.latitude = latitude
         self.thumb_files = thumb_files
         self.created_by = created_by
         self.created_time = created_time
@@ -522,6 +525,8 @@ def format_sql_to_record_obj(db_record_object):
                                other_ref=db_record_object.other_ref,
                                new_tags=tags,
                                linked_files=linked_files,
+                               longitude=db_record_object.longitude,
+                               latitude=db_record_object.latitude,
                                thumb_files=thumb_files,
                                created_by=db_record_object.created_by,
                                created_time=created_time,
@@ -535,7 +540,6 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
     if record_obj is None:
         return None
     else:
-        pass
         record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?",
                                        (str(record_obj.record_type),)))
         local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?",
@@ -571,6 +575,8 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
                        record_obj.physical_ref,
                        record_obj.other_ref,
                        tags_string,
+                       record_obj.longitude,
+                       record_obj.latitude,
                        record_obj.created_by,
                        created_time_stamp,
                        record_obj.last_changed_by,
@@ -721,16 +727,15 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print(params)
         print("Files to be linked:", files_to_link)
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
-            bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date,'
-                      'physical_ref, other_ref, tags, created_by, created_time, last_changed_by, last_changed_time)'
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
+                      'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
+                      'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                       params)
         else:
             params.append(record_id)
             bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
-                      "end_date=?, physical_ref=?, other_ref=?, tags=?, created_by=?, created_time=?,"
-                      "last_changed_by=?, last_changed_time=? WHERE id=?",
-                      params)
+                      "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
+                      "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
         conn.commit()
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
