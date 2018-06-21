@@ -194,7 +194,6 @@ class RecordEditor(wx.Frame):
         self.tags_box = wx.SearchCtrl(bg_panel, size=(350, -1))
         self.tags_box.ShowSearchButton(False)
         self.tags_box.SetDescriptiveText('Enter tags comma separated. (eg. tag1, tag2,...)')
-        self.tags_box.SetToolTip(wx.ToolTip('Enter tags comma separated. (eg. tag1, tag2,...)'))
         column_one.Add(self.tags_box, pos=(8, 2), span=(1, 4))
 
         # Lon/Lat Boxes
@@ -212,8 +211,8 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
         self.lon_lat_box.SetToolTip(lon_lat_tool_tip)
         column_one.Add(self.lon_lat_box, pos=(9, 2), span=(1, 3))
 
-        # Pin-view button
-        self.lon_lat_view_button = wx.Button(bg_panel, size=(120, 24), label="View in Google Earth")
+        # Pin view button
+        self.lon_lat_view_button = wx.Button(bg_panel, size=(120, 23), label="View in Google Earth")
         column_one.Add(self.lon_lat_view_button, pos=(9, 5))
 
         # New Column!
@@ -616,6 +615,8 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
 
         # remove link.
         print("Removing {}!".format(file_to_remove))
+        self.previewer.LoadFile(no_file_thumb)
+        self.previewer_file_name_lbl.SetLabel("")
         if database_io.is_file_in_dir(file_to_remove, self.cache_dir):
             print("Deleting {} for Temp Location.".format(file_to_remove))
             try:
@@ -731,7 +732,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                     break
 
         # Lon/Lat Box
-
+        # Todo: Add check for changes to this box
 
         # Files
         if len(self.temp_file_links) != len(self.record.linked_files):
