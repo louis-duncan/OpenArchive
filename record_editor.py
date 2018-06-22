@@ -861,15 +861,19 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
             saving_dlg = LoadingDialog(self, "Saving...")
             saving_dlg.Show(True)
             suc = database_io.commit_record(record_obj=new_record_obj)
+            self.previewer.LoadFile(no_file_thumb)
             if type(suc) == database_io.ArchiveRecord:
                 self.record = suc
                 self.refresh_all()
+                saving_dlg.Show(False)
+                saving_dlg.Destroy()
                 return None
             else:
                 error_msg = "Record not added due to:\n\n{}!\nConcerning...".format(suc)
             dlg = wx.MessageDialog(self, error_msg, style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
+            saving_dlg.Show(False)
             saving_dlg.Destroy()
         elif valid == "Bad Chars":
             dlg = wx.MessageDialog(self, "Record contains invalid characters!\n\nDisallowed Characters:\n{}"
@@ -882,8 +886,6 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                                    "Error", style=wx.ICON_ERROR)
             dlg.ShowModal()
             dlg.Destroy()
-
-        dlg.Destroy()
 
         return True
 
