@@ -154,7 +154,6 @@ Archive Location:
             return None
         print("Closing")
         database_io.clear_cache()
-        database_io.conn.close()
         self.Destroy()
         os.kill(os.getpid(), signal.CTRL_C_EVENT)
 
