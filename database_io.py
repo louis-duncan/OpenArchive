@@ -1,3 +1,4 @@
+import inspect
 import os
 import random
 import re
@@ -406,30 +407,37 @@ def create_new_database():
 def db_run(query, params):
     bliss = db_prep_for_access()
     if bliss is False:
+        db_unlock()
         return False
     else:
         bliss.run(query, params)
+        bliss.connection.commit()
         bliss.connection.close()
+        db_unlock()
         return True
 
 
 def db_all(query, params):
     bliss = db_prep_for_access()
     if bliss is False:
+        db_unlock()
         return False
     else:
         result = bliss.all(query, params)
         bliss.connection.close()
+        db_unlock()
         return result
 
 
 def db_one(query, params):
     bliss = db_prep_for_access()
     if bliss is False:
+        db_unlock()
         return False
     else:
         result = bliss.one(query, params)
         bliss.connection.close()
+        db_unlock()
         return result
 
 
@@ -437,13 +445,19 @@ def db_lock(ttl=10):
     stat_file_path = os.path.join(os.path.dirname(DATABASE_LOCATION), "stat.dat")
     lock_time = datetime.datetime.now() + datetime.timedelta(seconds=ttl)
     save_bin_file(stat_file_path, lock_time)
-    print("Database Locked until {}.".format(lock_time))
+    try:
+        caller_name = "{} > {} > {}".format(inspect.stack()[5][3],
+                                            inspect.stack()[4][3],
+                                            inspect.stack()[3][3])
+    except ValueError:
+        caller_name = "unknown"
+    print("\nDatabase locked at {} until {} by function:\n{}".format(datetime.datetime.now(), lock_time, caller_name))
 
 
 def db_unlock():
     stat_file_path = os.path.join(os.path.dirname(DATABASE_LOCATION), "stat.dat")
     save_bin_file(stat_file_path, None)
-    print("Database unLocked at {}.".format(datetime.datetime.now()))
+    print("Database unlocked at {}.".format(datetime.datetime.now()))
 
 
 def db_check_lock_status():
@@ -529,9 +543,8 @@ def get_record_by_id(record_id=0):
     if ";" in str(record_id):
         return None
     else:
-        bliss = open_database_connection()
-        item = bliss.one("SELECT * FROM resources WHERE id=?", (record_id,))
-        bliss.connection.close()
+        item = db_one("SELECT * FROM resources WHERE id=?", (record_id,))
+        # Todo add catch for 'item is false' caused by failed connection.
         if item is None:
             return None
         else:
@@ -555,9 +568,8 @@ def get_filtered_records(types=(), local_authorities=()):
 
     q = "SELECT * FROM resources WHERE record_type IN ({}) OR local_auth IN ({})".format(types_param_string,
                                                                                          local_authorities_string)
-    bliss = open_database_connection()
-    records = bliss.all(q, ())
-    bliss.connection.close()
+    records = db_all(q, ())
+    # Todo: Add catch for 'records if False' caused by failed connection
     formatted_records = []
     for r in records:
         formatted_records.append(format_sql_to_record_obj(r))
@@ -566,10 +578,9 @@ def get_filtered_records(types=(), local_authorities=()):
 
 def format_sql_to_record_obj(db_record_object):
     # Convert Type and Auth ids to text.
-    bliss = open_database_connection()
-    type_text = bliss.one("SELECT * FROM types WHERE id=?", (db_record_object.record_type,)).type_text
-    auth_text = bliss.one("SELECT * FROM local_authorities WHERE id=?", (db_record_object.local_auth,)).local_auth
-    bliss.connection.close()
+    type_text = db_one("SELECT * FROM types WHERE id=?", (db_record_object.record_type,)).type_text
+    auth_text = db_one("SELECT * FROM local_authorities WHERE id=?", (db_record_object.local_auth,)).local_auth
+    # Todo: Add catch for "False in (type_text, auth_text) caused by failed connection.
 
     # Convert dates to datetimes
     if db_record_object.start_date is None:
@@ -599,9 +610,8 @@ def format_sql_to_record_obj(db_record_object):
 
     linked_files = []
     thumb_files = []
-    bliss = open_database_connection()
-    record_file_links = bliss.all("SELECT * FROM file_links WHERE record_id=?", (db_record_object.id,))
-    bliss.connection.close()
+    record_file_links = db_all("SELECT * FROM file_links WHERE record_id=?", (db_record_object.id,))
+    # Todo: Add catch for "record_file_links is False" caused by failed connection.
     for f in record_file_links:
         linked_files.append(f.file_path)
         thumb_files.append(f.thumbnail_path)
@@ -633,12 +643,15 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
     if record_obj is None:
         return None
     else:
-        bliss = open_database_connection()
-        record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?",
-                                       (str(record_obj.record_type),)))
-        local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?",
-                                      (str(record_obj.local_auth),)))
-        bliss.connection.close()
+        record_type_id = db_one("SELECT id FROM types WHERE type_text=?",
+                                       (str(record_obj.record_type),))
+        local_auth_id = db_one("SELECT id FROM local_authorities WHERE local_auth=?",
+                                      (str(record_obj.local_auth),))
+        # Todo: Add catch for "False in (record_type_id, local_auth_id)" cause by failed connection.
+
+        record_type_id = int(record_type_id)
+        local_auth_id = int(local_auth_id)
+
         if record_obj.start_date is None:
             start_date_stamp = None
         else:
@@ -681,9 +694,8 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
 
 
 def return_types():
-    bliss = open_database_connection()
-    type_records = bliss.all("SELECT * FROM types", ())
-    bliss.connection.close()
+    type_records = db_all("SELECT * FROM types", ())
+    # Todo: Add catch for "type_records is False" caused by failed connection.
     types = []
     for r in type_records:
         types.append(r.type_text)
@@ -691,9 +703,8 @@ def return_types():
 
 
 def return_local_authorities():
-    bliss = open_database_connection()
-    local_authority_records = bliss.all("SELECT * FROM local_authorities", ())
-    bliss.connection.close()
+    local_authority_records = db_all("SELECT * FROM local_authorities", ())
+    # Todo: Add catch for "local_authority_records is False" caused by failed connection.
     local_authorities = []
     for r in local_authority_records:
         local_authorities.append(r.local_auth)
@@ -716,14 +727,13 @@ def float_none_drop_other(t):
 
 
 def get_thumbnail(file_link_id=None, file_path=None):
-    bliss = open_database_connection()
     if file_link_id is not None:
-        thumbnail_record = bliss.one("SELECT * FROM file_links WHERE id=?", (file_link_id,))
+        thumbnail_record = db_one("SELECT * FROM file_links WHERE id=?", (file_link_id,))
     elif file_path is not None:
-        thumbnail_record = bliss.one("SELECT * FROM file_links WHERE file_path=?", (file_path,))
+        thumbnail_record = db_one("SELECT * FROM file_links WHERE file_path=?", (file_path,))
     else:
         return None
-    bliss.connection.close()
+    # Todo: Add catch for "thumbnail_record is False" caused by failed connection.
     if thumbnail_record is None:
         return None
     else:
@@ -827,24 +837,23 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print(record_id)
         print(params)
         print("Files to be linked:", files_to_link)
-        bliss = open_database_connection()
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
-            bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
+            suc = db_run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
                       'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
                       'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                       params)
         else:
             params.append(record_id)
-            bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
+            suc = db_run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
                       "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
                       "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
-        bliss.connection.commit()
-
+        # Todo: Add check to see if "suc is False" caused by failed connection.
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
-        record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
-                                                        (changed_time_stamp,)))
-        old_file_links = bliss.all("SELECT * FROM file_links WHERE record_id=?", (record_obj.record_id,))
-        bliss.connection.close()
+        record_obj = format_sql_to_record_obj(db_one("SELECT * FROM resources WHERE last_changed_time=?",
+                                                     (changed_time_stamp,)))
+        # Todo: Add catch for "record_obj is False" cause by failed connection.
+        old_file_links = db_all("SELECT * FROM file_links WHERE record_id=?", (record_obj.record_id,))
+        # Todo: Add catch for "old_file_links is False" cause by failed connection.
         # Compare list of old links to the newly submitted links
         # If the old link is not in the new list, mark as dead.
         # If is is, remove that file name from the list.
@@ -864,19 +873,16 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                 pass
             else:  # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
-            bliss = open_database_connection()
-            bliss.run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
-                      (record_obj.record_id, link_f, ""))
-            bliss.connection.commit()
-            bliss.connection.close()
+            suc = db_run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
+                         (record_obj.record_id, link_f, ""))
+            # Todo: Add catch for "suc is False" caused by failed connection.
 
         # Now clear away dead links.
         for i, link in enumerate(old_file_links):
             if dead_links[i] is True:
                 # Check is truly dead
-                bliss = open_database_connection()
-                hope = bliss.all("SELECT * FROM file_links WHERE file_path=?", (link.file_path,))
-                bliss.connection.close()
+                hope = db_all("SELECT * FROM file_links WHERE file_path=?", (link.file_path,))
+                # Todo: Add catch for "hope is False" caused by failed connection
                 if len(hope) <= 1:
                     if (len(hope) == 1) and (int(hope[0].record_id) != int(record_obj.record_id)):
                         print("")
@@ -914,21 +920,17 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
                         # Finally, remove the actual link as long as the file was successfuly deleted.
                         if suc:
-                            bliss = open_database_connection()
-                            bliss.run("DELETE FROM file_links WHERE id=?", (link.id,))
-                            bliss.connection.commit()
-                            bliss.connection.close()
-
+                            del_suc = db_run("DELETE FROM file_links WHERE id=?", (link.id,))
+                            # Todo: Add catch for "del_suc is False" caused by failed connection.
                 else:
                     print("Just enough hope to save the link between"
                           "{} and {}.".format(record_obj.record_id, link.file_path))
                     pass
             else:
                 pass
-        bliss = open_database_connection()
-        record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
-                                                        (changed_time_stamp,)))
-        bliss.connection.close()
+        sql_record_obj = db_one("SELECT * FROM resources WHERE last_changed_time=?", (changed_time_stamp,))
+        # Todo: Add catch for "sql_record_obj is False" caused by failed connection.
+        record_obj = format_sql_to_record_obj(sql_record_obj)
         return record_obj
     except sqlite3.IntegrityError:
         return "IntegrityError"
@@ -938,17 +940,16 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
 def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
     # Only retrieve results in the resource and auth brackets.
-    bliss = open_database_connection()
     if (resource_type is None) and (local_auth is None):
-        base_list = bliss.all("SELECT * FROM resources", [])
+        base_list = db_all("SELECT * FROM resources", [])
     elif (resource_type is not None) and (local_auth is None):
-        base_list = bliss.all("SELECT * FROM resources WHERE record_type=?", [resource_type, ])
+        base_list = db_all("SELECT * FROM resources WHERE record_type=?", [resource_type, ])
     elif (resource_type is None) and (local_auth is not None):
-        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=?", [local_auth, ])
+        base_list = db_all("SELECT * FROM resources WHERE local_auth=?", [local_auth, ])
     else:
-        base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
+        base_list = db_all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
                               (local_auth, resource_type))
-    bliss.connection.close()
+    # Todo: Add catch for "base_list is False" caused by failed connection.
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(base_list, text)
         return scored_results
@@ -1036,17 +1037,13 @@ def check_record(record_obj: ArchiveRecord):
 
 
 def add_new_type(type_string):
-    bliss = open_database_connection()
-    bliss.run("INSERT INTO types (type_text) VALUES (?)", (type_string,))
-    bliss.connection.commit()
-    bliss.connection.close()
+    suc = db_run("INSERT INTO types (type_text) VALUES (?)", (type_string,))
+    # Todo: Add check for "suc is False" caused by failed connection.
 
 
 def add_new_local_authority(local_auth_string):
-    bliss = open_database_connection()
-    bliss.run("INSERT INTO local_authorities (local_auth) VALUES (?)", (local_auth_string,))
-    bliss.connection.commit()
-    bliss.connection.close()
+    suc = db_run("INSERT INTO local_authorities (local_auth) VALUES (?)", (local_auth_string,))
+    # Todo: Add check for "suc is False" caused by failed connection.
 
 
 def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
@@ -1059,22 +1056,19 @@ def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
 
 
 def add_bookmark(user_name="", record_id=0):
-    bliss = open_database_connection()
-    check = bliss.one("SELECT title FROM resources WHERE id=?", (record_id,))
+    check = db_one("SELECT title FROM resources WHERE id=?", (record_id,))
+    # Todo: Add catch for "check is False" caused by failed connection.
     assert check is not None
     if user_name is None or user_name == "":
         user_name = os.environ["USERNAME"]
     print("Bookmarking {} for {}".format(check, user_name))
-    bliss.run("INSERT INTO bookmarks (user_name, record_id) VALUES (?, ?)", (user_name, record_id))
-    bliss.connection.commit()
-    bliss.connection.close()
+    suc = db_run("INSERT INTO bookmarks (user_name, record_id) VALUES (?, ?)", (user_name, record_id))
+    # Todo: Add catch for "suc is False" caused by failed connection.
 
 
 def remove_bookmark(user_name, record_id):
-    bliss = open_database_connection()
-    bliss.run("DELETE FROM bookmarks WHERE user_name=? AND record_id=?", (user_name, record_id))
-    bliss.connection.commit()
-    bliss.connection.close()
+    suc = db_run("DELETE FROM bookmarks WHERE user_name=? AND record_id=?", (user_name, record_id))
+    # Todo: Add catch for "suc is False" caused by failed connection.
 
 
 def get_user_bookmarks(user_name=None):
@@ -1082,16 +1076,14 @@ def get_user_bookmarks(user_name=None):
         user_name = os.environ["USERNAME"]
     else:
         pass
-    bliss = open_database_connection()
-    results = bliss.all("SELECT record_id FROM bookmarks WHERE user_name=?", (user_name,))
-    bliss.connection.close()
+    results = db_all("SELECT record_id FROM bookmarks WHERE user_name=?", (user_name,))
+    # Todo: Add catch for "results is False" caused by failed connection
     return results
 
 
 def get_files_links(file_path):
-    bliss = open_database_connection()
-    results = bliss.all("SELECT * FROM file_links WHERE file_path=?", (file_path,))
-    bliss.connection.close()
+    results = db_all("SELECT * FROM file_links WHERE file_path=?", (file_path,))
+    # Todo: Add catch for "results is False" caused by failed connection.
     return results
 
 
