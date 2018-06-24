@@ -1016,10 +1016,12 @@ def get_files_links(file_path):
 
 def is_file_in_root(file_path, root):
     in_dir = False
+    print("Is {} in {}? ".format(file_path, root), end="")
     try:
         in_dir = os.path.abspath(root) == os.path.commonpath((root, file_path))
+        print(str(in_dir))
     except ValueError:
-        pass
+        print("Error")
 
     return in_dir
 
