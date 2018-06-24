@@ -732,7 +732,20 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                     break
 
         # Lon/Lat Box
-        # Todo: Add check for changes to this box
+        input_lon_lat_valid = coord.validate(self.lon_lat_box.GetValue())
+        input_lon_lat_empty = self.lon_lat_box.GetValue().strip() == ""
+        if input_lon_lat_valid:
+            input_lon, input_lat = coord.normalise(self.lon_lat_box.GetValue())
+            if (input_lon != self.record.longitude) or (input_lat != self.record.latitude):
+                self.unsaved_changes = True
+                print("Lon/Lat Changed")
+            else:
+                pass
+        elif input_lon_lat_empty and (None not in (self.record.longitude, self.record.latitude)):
+            self.unsaved_changes = True
+            print("Lon/Lat Changed")
+        else:
+            pass
 
         # Files
         if len(self.temp_file_links) != len(self.record.linked_files):
@@ -757,6 +770,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
             self.remove_file_button.Enable()
         else:
             pass
+
         # Lon/Lat View button
         if coord.validate(self.lon_lat_box.GetValue().strip()) is True:
             self.lon_lat_view_button.Enable()
@@ -841,6 +855,25 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                                              self.end_date_picker.GetValue().month + 1,
                                              self.end_date_picker.GetValue().day)
 
+        if self.lon_lat_box.GetValue().strip() == "":
+            lon = lat = None
+        elif coord.validate(self.lon_lat_box.GetValue()):
+            lon, lat = coord.normalise(self.lon_lat_box.GetValue())
+        else:
+            dlg = wx.MessageDialog(self, "Invalid location will not be saved.\n"
+                                         "\n"
+                                         "The location which has been entered is invalid, and so will not be saved."
+                                         "Do you wish to continue?",
+                                   "Confirm Invalid Location",
+                                   style=wx.YES_NO | wx.ICON_EXCLAMATION | wx.NO_DEFAULT)
+            resp = dlg.ShowModal()
+            dlg.Destroy()
+            if resp == wx.ID_YES:
+                pass
+            else:
+                return False
+            lon, lat = self.record.longitude, self.record.latitude
+
         new_record_obj = database_io.ArchiveRecord(record_id=self.record.record_id,
                                                    title=self.title_box.GetValue().strip(),
                                                    description=self.desc_box.GetValue().strip(),
@@ -850,6 +883,8 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                                                    end_date=new_end_date,
                                                    physical_ref=self.physical_ref_box.GetValue().strip(),
                                                    other_ref=self.other_ref_box.GetValue().strip(),
+                                                   longitude=lon,
+                                                   latitude=lat,
                                                    linked_files=self.temp_file_links,
                                                    created_by=self.record.created_by,
                                                    created_time=self.record.created_time
@@ -931,6 +966,17 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
                 self.bookmark_button.Label = "Remove From\nMy List"
             else:
                 pass
+
+        # Lon/Lat Box
+        if coord.validate(self.lon_lat_box.GetValue()):
+            self.record.longitude, self.record.latitude = coord.normalise(self.lon_lat_box.GetValue())
+            self.lon_lat_box.ChangeValue("{}, {}".format(self.record.longitude,
+                                                         self.record.latitude))
+        else:
+            if coord.validate("{},{}".format(self.record.longitude, self.record.latitude)):
+                self.lon_lat_box.ChangeValue("{}, {}".format(self.record.longitude, self.record.latitude))
+            else:
+                self.lon_lat_box.ChangeValue("")
 
         self.set_changed()
 
