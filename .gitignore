@@ -2,3 +2,5 @@
 \.idea/
 
 guitest\.py
+
+__pycache__/
