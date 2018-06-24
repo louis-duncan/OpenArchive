@@ -1,4 +1,5 @@
 import os
+import random
 import re
 import sqlite3
 import time
@@ -9,10 +10,10 @@ import pickle
 import temp
 import textdistance
 import shutil
-
 from sql import SQL
 
-import im2pdf_fix.im2pdf as im2pdf
+# Initialise the random module
+random.seed(str(os.environ["USERNAME"] + str(datetime.datetime.now())))
 
 __title__ = "OpenArchive"
 
@@ -88,17 +89,18 @@ class ArchiveRecord:
         else:
             desc_string = self.description
 
-        return "ID: {}\nTitle: {}\nDecription:\n{}\nType: {}\nAuth: {}\nDates: {} - {}\nPhysical Ref: {}\nOther Ref: {}\nTags: {}".format(self.record_id,
-                                                                                                                                          self.title,
-                                                                                                                                          self.description,
-                                                                                                                                          self.record_type,
-                                                                                                                                          self.local_auth,
-                                                                                                                                          self.start_date_string(),
-                                                                                                                                          self.end_date_string(),
-                                                                                                                                          self.physical_ref,
-                                                                                                                                          self.other_ref,
-                                                                                                                                          self.string_tags(),
-                                                                                                                                          )
+        return "ID: {}\nTitle: {}\nDecription:\n{}\nType: {}\nAuth: {}\nDates: {} - {}\nPhysical Ref: {}\nOther Ref: {}\nTags: {}".format(
+            self.record_id,
+            self.title,
+            self.description,
+            self.record_type,
+            self.local_auth,
+            self.start_date_string(),
+            self.end_date_string(),
+            self.physical_ref,
+            self.other_ref,
+            self.string_tags(),
+            )
 
     def launch_file(self, file_index=0, file_path=None, cache_dir=TEMP_DATA_LOCATION):
         if (self.linked_files is None) and (file_path is None):
@@ -229,10 +231,10 @@ def load_config():
     for i in ARCHIVE_INCLUDED_DIRS:
         formatted_incs += i + "|"
     formatted_incs = formatted_incs.strip("|")
-    global_config = {"DATABASE_LOCATION" : DATABASE_LOCATION,
-                     "ARCHIVE_LOCATION_ROOT" : ARCHIVE_LOCATION_ROOT,
-                     "ARCHIVE_LOCATION_SUB" : ARCHIVE_LOCATION_SUB,
-                     "ARCHIVE_INCLUDED_DIRS" : formatted_incs,
+    global_config = {"DATABASE_LOCATION": DATABASE_LOCATION,
+                     "ARCHIVE_LOCATION_ROOT": ARCHIVE_LOCATION_ROOT,
+                     "ARCHIVE_LOCATION_SUB": ARCHIVE_LOCATION_SUB,
+                     "ARCHIVE_INCLUDED_DIRS": formatted_incs,
                      }
 
     # Load local config
@@ -264,7 +266,7 @@ def load_config():
     # Set values
     GLOBAL_CONFIG = local_config["GLOBAL_CONFIG"]
     TEMP_DATA_LOCATION = local_config["TEMP_DATA_LOCATION"]
-    
+
     # Re-write the config file
     try:
         os.mkdir(os.path.dirname(LOCAL_CONFIG))
@@ -282,7 +284,7 @@ def load_config():
         with open(GLOBAL_CONFIG, "r") as file:
             global_config_lines = file.readlines()
     except FileNotFoundError:
-            global_config_lines = []
+        global_config_lines = []
 
     for l in global_config_lines:
         v_name, v_value = l.split("=", 1)
@@ -309,7 +311,7 @@ def load_config():
     ARCHIVE_LOCATION_ROOT = global_config["ARCHIVE_LOCATION_ROOT"]
     ARCHIVE_LOCATION_SUB = global_config["ARCHIVE_LOCATION_SUB"]
     ARCHIVE_INCLUDED_DIRS = listed_incs
-    
+
     # Re-write the config file
     try:
         os.mkdir(os.path.dirname(GLOBAL_CONFIG))
@@ -334,8 +336,8 @@ def load_config():
                                          ARCHIVE_LOCATION_ROOT,
                                          ARCHIVE_LOCATION_SUB,
                                          ARCHIVE_INCLUDED_DIRS))
-        
-  
+
+
 def create_new_database():
     try:
         os.mkdir(os.path.abspath(os.path.dirname(DATABASE_LOCATION)))
@@ -399,6 +401,85 @@ def create_new_database():
         new_bliss.run(q, ())
     new_conn.commit()
     new_conn.close()
+
+
+def db_run(query, params):
+    bliss = db_prep_for_access()
+    if bliss is False:
+        return False
+    else:
+        bliss.run(query, params)
+        bliss.connection.close()
+        return True
+
+
+def db_all(query, params):
+    bliss = db_prep_for_access()
+    if bliss is False:
+        return False
+    else:
+        result = bliss.all(query, params)
+        bliss.connection.close()
+        return result
+
+
+def db_one(query, params):
+    bliss = db_prep_for_access()
+    if bliss is False:
+        return False
+    else:
+        result = bliss.one(query, params)
+        bliss.connection.close()
+        return result
+
+
+def db_lock(ttl=10):
+    stat_file_path = os.path.join(os.path.dirname(DATABASE_LOCATION), "stat.dat")
+    lock_time = datetime.datetime.now() + datetime.timedelta(seconds=ttl)
+    save_bin_file(stat_file_path, lock_time)
+    print("Database Locked until {}.".format(lock_time))
+
+
+def db_unlock():
+    stat_file_path = os.path.join(os.path.dirname(DATABASE_LOCATION), "stat.dat")
+    save_bin_file(stat_file_path, None)
+    print("Database unLocked at {}.".format(datetime.datetime.now()))
+
+
+def db_check_lock_status():
+    stat_file_path = os.path.join(os.path.dirname(DATABASE_LOCATION), "stat.dat")
+    current_lock: datetime.datetime = access_bin_file(stat_file_path)
+    if current_lock is None:
+        return 0
+    else:
+        ttl = (current_lock - datetime.datetime.now()).total_seconds()
+        if ttl < 0:
+            return 0
+        else:
+            return ttl
+
+
+def db_prep_for_access(timeout=10):
+    wait_time = 0
+    tries = 0
+    while True:
+        locked = db_check_lock_status()
+        if locked > 0:
+            salt = random.uniform(0, 3)
+            tries += 1
+            print("Try number {} failed. Waiting {} seconds...".format(tries, salt))
+            time.sleep(salt)
+            wait_time += salt
+        else:
+            break
+        if wait_time > timeout:
+            print("Timed out after {) tries over {} seconds.".format(tries, wait_time))
+            return False
+        else:
+            pass
+    db_lock()
+    bliss = open_database_connection()
+    return bliss
 
 
 def access_bin_file(filename):
@@ -1083,7 +1164,6 @@ else:
                        "{}\n"
                        "\n"
                        "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
-
 
 try:
     if os.path.exists(DATABASE_LOCATION):
