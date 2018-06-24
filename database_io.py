@@ -9,6 +9,9 @@ import pickle
 import temp
 import textdistance
 import shutil
+
+from sql import SQL
+
 import im2pdf_fix.im2pdf as im2pdf
 
 __title__ = "OpenArchive"
@@ -445,7 +448,9 @@ def get_record_by_id(record_id=0):
     if ";" in str(record_id):
         return None
     else:
+        bliss = open_database_connection()
         item = bliss.one("SELECT * FROM resources WHERE id=?", (record_id,))
+        bliss.connection.close()
         if item is None:
             return None
         else:
@@ -469,7 +474,9 @@ def get_filtered_records(types=(), local_authorities=()):
 
     q = "SELECT * FROM resources WHERE record_type IN ({}) OR local_auth IN ({})".format(types_param_string,
                                                                                          local_authorities_string)
+    bliss = open_database_connection()
     records = bliss.all(q, ())
+    bliss.connection.close()
     formatted_records = []
     for r in records:
         formatted_records.append(format_sql_to_record_obj(r))
@@ -478,8 +485,10 @@ def get_filtered_records(types=(), local_authorities=()):
 
 def format_sql_to_record_obj(db_record_object):
     # Convert Type and Auth ids to text.
+    bliss = open_database_connection()
     type_text = bliss.one("SELECT * FROM types WHERE id=?", (db_record_object.record_type,)).type_text
     auth_text = bliss.one("SELECT * FROM local_authorities WHERE id=?", (db_record_object.local_auth,)).local_auth
+    bliss.connection.close()
 
     # Convert dates to datetimes
     if db_record_object.start_date is None:
@@ -509,7 +518,10 @@ def format_sql_to_record_obj(db_record_object):
 
     linked_files = []
     thumb_files = []
-    for f in bliss.all("SELECT * FROM file_links WHERE record_id=?", (db_record_object.id,)):
+    bliss = open_database_connection()
+    record_file_links = bliss.all("SELECT * FROM file_links WHERE record_id=?", (db_record_object.id,))
+    bliss.connection.close()
+    for f in record_file_links:
         linked_files.append(f.file_path)
         thumb_files.append(f.thumbnail_path)
 
@@ -540,10 +552,12 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
     if record_obj is None:
         return None
     else:
+        bliss = open_database_connection()
         record_type_id = int(bliss.one("SELECT id FROM types WHERE type_text=?",
                                        (str(record_obj.record_type),)))
         local_auth_id = int(bliss.one("SELECT id FROM local_authorities WHERE local_auth=?",
                                       (str(record_obj.local_auth),)))
+        bliss.connection.close()
         if record_obj.start_date is None:
             start_date_stamp = None
         else:
@@ -586,7 +600,9 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
 
 
 def return_types():
+    bliss = open_database_connection()
     type_records = bliss.all("SELECT * FROM types", ())
+    bliss.connection.close()
     types = []
     for r in type_records:
         types.append(r.type_text)
@@ -594,7 +610,9 @@ def return_types():
 
 
 def return_local_authorities():
+    bliss = open_database_connection()
     local_authority_records = bliss.all("SELECT * FROM local_authorities", ())
+    bliss.connection.close()
     local_authorities = []
     for r in local_authority_records:
         local_authorities.append(r.local_auth)
@@ -617,12 +635,14 @@ def float_none_drop_other(t):
 
 
 def get_thumbnail(file_link_id=None, file_path=None):
+    bliss = open_database_connection()
     if file_link_id is not None:
         thumbnail_record = bliss.one("SELECT * FROM file_links WHERE id=?", (file_link_id,))
     elif file_path is not None:
         thumbnail_record = bliss.one("SELECT * FROM file_links WHERE file_path=?", (file_path,))
     else:
         return None
+    bliss.connection.close()
     if thumbnail_record is None:
         return None
     else:
@@ -692,7 +712,7 @@ def check_if_in_archive(path):
     in_archive = False
     for r in roots_to_check:
         print(r)
-        if is_file_in_dir(path, r):
+        if is_file_in_root(path, r):
             in_archive = True
             break
         else:
@@ -726,6 +746,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print(record_id)
         print(params)
         print("Files to be linked:", files_to_link)
+        bliss = open_database_connection()
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
             bliss.run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
                       'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
@@ -736,12 +757,13 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
             bliss.run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
                       "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
                       "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
-        conn.commit()
+        bliss.connection.commit()
+
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))
-        old_file_links = bliss.all("SELECT * FROM main.file_links WHERE record_id=?", (record_obj.record_id,))
-
+        old_file_links = bliss.all("SELECT * FROM file_links WHERE record_id=?", (record_obj.record_id,))
+        bliss.connection.close()
         # Compare list of old links to the newly submitted links
         # If the old link is not in the new list, mark as dead.
         # If is is, remove that file name from the list.
@@ -757,18 +779,23 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         # The remaining files in the submitted list are new links, so deal with them.
         for f in files_to_link:
             link_f = os.path.abspath(f)
-            if check_if_in_archive(link_f): # If file in archive, no need to copy it in.
+            if check_if_in_archive(link_f):  # If file in archive, no need to copy it in.
                 pass
-            else: # Move the file from it's current location to the archive.
+            else:  # Move the file from it's current location to the archive.
                 link_f = move_file_to_archive(f)
+            bliss = open_database_connection()
             bliss.run("INSERT INTO file_links (record_id, file_path, thumbnail_path) VALUES (?, ?, ?)",
                       (record_obj.record_id, link_f, ""))
+            bliss.connection.commit()
+            bliss.connection.close()
 
         # Now clear away dead links.
         for i, link in enumerate(old_file_links):
             if dead_links[i] is True:
                 # Check is truly dead
+                bliss = open_database_connection()
                 hope = bliss.all("SELECT * FROM file_links WHERE file_path=?", (link.file_path,))
+                bliss.connection.close()
                 if len(hope) <= 1:
                     if (len(hope) == 1) and (int(hope[0].record_id) != int(record_obj.record_id)):
                         print("")
@@ -784,7 +811,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
                         # Check if the file we're un-linking is in the dir managed by OpenArchive.
                         # If so, copy it to the desktop.
-                        in_sub = is_file_in_dir(ARCHIVE_LOCATION_SUB, link.file_path)
+                        in_sub = is_file_in_root(ARCHIVE_LOCATION_SUB, link.file_path)
 
                         suc = True
                         if in_sub:
@@ -806,7 +833,10 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
                         # Finally, remove the actual link as long as the file was successfuly deleted.
                         if suc:
+                            bliss = open_database_connection()
                             bliss.run("DELETE FROM file_links WHERE id=?", (link.id,))
+                            bliss.connection.commit()
+                            bliss.connection.close()
 
                 else:
                     print("Just enough hope to save the link between"
@@ -814,10 +844,10 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
                     pass
             else:
                 pass
-
-        conn.commit()
+        bliss = open_database_connection()
         record_obj = format_sql_to_record_obj(bliss.one("SELECT * FROM resources WHERE last_changed_time=?",
                                                         (changed_time_stamp,)))
+        bliss.connection.close()
         return record_obj
     except sqlite3.IntegrityError:
         return "IntegrityError"
@@ -827,6 +857,7 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
 
 def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
     # Only retrieve results in the resource and auth brackets.
+    bliss = open_database_connection()
     if (resource_type is None) and (local_auth is None):
         base_list = bliss.all("SELECT * FROM resources", [])
     elif (resource_type is not None) and (local_auth is None):
@@ -836,6 +867,7 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
     else:
         base_list = bliss.all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
                               (local_auth, resource_type))
+    bliss.connection.close()
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(base_list, text)
         return scored_results
@@ -853,9 +885,7 @@ def move_file_to_archive(cached_path=""):
 
 def score_results(results, text):
     scores = []
-    r: ArchiveRecord
     for r in results:
-        #print()
         # Gen score
         title_similarity = 4 * textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
         key_words = text.upper().split(" ")
@@ -897,11 +927,7 @@ def score_results(results, text):
                     pass
             else:
                 pass
-        #print(key_words)
-        #print(title_similarity, key_word_hits, int(physical_ref_hit), int(other_ref_hit))
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
-        #if score < 1.0:
-        #    score = 0.0
         score = round(score, 1)
         print(r.id, score)
         if score == 0.0:
@@ -929,37 +955,45 @@ def check_record(record_obj: ArchiveRecord):
 
 
 def add_new_type(type_string):
+    bliss = open_database_connection()
     bliss.run("INSERT INTO types (type_text) VALUES (?)", (type_string,))
-    conn.commit()
+    bliss.connection.commit()
+    bliss.connection.close()
 
 
 def add_new_local_authority(local_auth_string):
+    bliss = open_database_connection()
     bliss.run("INSERT INTO local_authorities (local_auth) VALUES (?)", (local_auth_string,))
-    conn.commit()
+    bliss.connection.commit()
+    bliss.connection.close()
 
 
 def move_file_to_cache(new_file_path, cache_dir=TEMP_DATA_LOCATION):
     assert cache_dir.startswith(TEMP_DATA_LOCATION)
 
-    if is_file_in_dir(new_file_path, cache_dir):
+    if is_file_in_root(new_file_path, cache_dir):
         return os.path.abspath(new_file_path)
     else:
         return shutil.copy2(new_file_path, cache_dir)
 
 
 def add_bookmark(user_name="", record_id=0):
+    bliss = open_database_connection()
     check = bliss.one("SELECT title FROM resources WHERE id=?", (record_id,))
     assert check is not None
     if user_name is None or user_name == "":
         user_name = os.environ["USERNAME"]
     print("Bookmarking {} for {}".format(check, user_name))
     bliss.run("INSERT INTO bookmarks (user_name, record_id) VALUES (?, ?)", (user_name, record_id))
-    conn.commit()
+    bliss.connection.commit()
+    bliss.connection.close()
 
 
 def remove_bookmark(user_name, record_id):
+    bliss = open_database_connection()
     bliss.run("DELETE FROM bookmarks WHERE user_name=? AND record_id=?", (user_name, record_id))
-    conn.commit()
+    bliss.connection.commit()
+    bliss.connection.close()
 
 
 def get_user_bookmarks(user_name=None):
@@ -967,18 +1001,23 @@ def get_user_bookmarks(user_name=None):
         user_name = os.environ["USERNAME"]
     else:
         pass
+    bliss = open_database_connection()
     results = bliss.all("SELECT record_id FROM bookmarks WHERE user_name=?", (user_name,))
+    bliss.connection.close()
     return results
 
 
 def get_files_links(file_path):
-    return bliss.all("SELECT * FROM main.file_links WHERE file_path=?", (file_path,))
+    bliss = open_database_connection()
+    results = bliss.all("SELECT * FROM file_links WHERE file_path=?", (file_path,))
+    bliss.connection.close()
+    return results
 
 
-def is_file_in_dir(path, dir):
+def is_file_in_root(file_path, root):
     in_dir = False
     try:
-        in_dir = os.path.abspath(dir) == os.path.commonpath((dir, path))
+        in_dir = os.path.abspath(root) == os.path.commonpath((root, file_path))
     except ValueError:
         pass
 
@@ -1000,6 +1039,12 @@ def is_file_in_archive(file_path):
     return in_archive
 
 
+def open_database_connection() -> SQL:
+    conn = sqlite3.connect(DATABASE_LOCATION)
+    bliss: SQL = sql.SQL(conn)
+    return bliss
+
+
 # Main Script
 
 load_config()
@@ -1010,7 +1055,7 @@ else:
     try:
         os.mkdir(ARCHIVE_LOCATION_ROOT)
     except:
-        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
+        easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
                        "{}\n"
                        "\n"
                        "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
@@ -1021,7 +1066,7 @@ else:
     try:
         os.mkdir(ARCHIVE_LOCATION_SUB)
     except:
-        easygui.msgbox("OpenArchive could not access or create a data repository at:\n"
+        easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
                        "{}\n"
                        "\n"
                        "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
@@ -1032,23 +1077,24 @@ else:
     try:
         os.mkdir(TEMP_DATA_LOCATION)
     except:
-        easygui.msgbox("OpenArchive could not access or create the temporary data location at:\n"
+        easygui.msgbox("OpenArchiveManager could not access or create the temporary data location at:\n"
                        "{}\n"
                        "\n"
                        "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
+
 
 try:
     if os.path.exists(DATABASE_LOCATION):
         pass
     else:
-        easygui.msgbox("Could load the database at '{}'\n"
+        easygui.msgbox("Could not load the database at '{}'\n"
                        "\n"
                        "OpenArchive will attempt to start a new database.".format(DATABASE_LOCATION))
         create_new_database()
-    conn = sqlite3.connect(DATABASE_LOCATION)
-    bliss = sql.SQL(conn)
+    test_connection = open_database_connection()
+    test_connection.connection.close()
 except sqlite3.OperationalError:
-    easygui.msgbox("Could load the database at '{}'\n"
+    easygui.msgbox("Could not load the database at '{}'\n"
                    "\n"
                    "The path may not be valid.".format(DATABASE_LOCATION))
     exit()

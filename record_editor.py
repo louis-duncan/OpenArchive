@@ -565,7 +565,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
             # This allows the process to continue is there is only one link, but that link is from a different record.
             # This shouldn't happen, but might occur if multiple people happen to be accessing the same record.
             pass
-        elif (len(links) <= 1) and database_io.is_file_in_dir(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
+        elif (len(links) <= 1) and database_io.is_file_in_root(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
             dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
                                              "\n"
@@ -581,7 +581,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
             else:
                 pass
         elif ((len(links) <= 1) and database_io.check_if_in_archive(file_to_remove)) \
-                and not database_io.is_file_in_dir(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
+                and not database_io.is_file_in_root(database_io.ARCHIVE_LOCATION_SUB, file_to_remove):
             #  Raise message, and if continued, create copy, unlink, and remove from repo
             dlg = wx.RichMessageDialog(self, "Are you sure you want to unlink this file?\n"
                                              "\n"
@@ -617,7 +617,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
         print("Removing {}!".format(file_to_remove))
         self.previewer.LoadFile(no_file_thumb)
         self.previewer_file_name_lbl.SetLabel("")
-        if database_io.is_file_in_dir(file_to_remove, self.cache_dir):
+        if database_io.is_file_in_root(file_to_remove, self.cache_dir):
             print("Deleting {} for Temp Location.".format(file_to_remove))
             try:
                 os.remove(file_to_remove)
