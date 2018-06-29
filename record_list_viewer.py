@@ -6,6 +6,8 @@ import easygui
 import csv
 import database_io
 import os
+
+import kml_load
 import record_editor
 
 from database_io import ArchiveRecord
@@ -18,6 +20,7 @@ test_data = None
 class RecordListViewer(wx.Frame):
     def __init__(self, parent, title, records):
         # Define the headings for later
+        self.records = records
 
         closing = False
 
@@ -27,7 +30,8 @@ class RecordListViewer(wx.Frame):
                     ("Type:", 150),
                     ("Source/Local Auth.:", 150),
                     ("Date Period:", 150),
-                    ("Tags:", 200)
+                    ("Tags:", 200),
+                    ("NESW:", 50)
                     )
 
         total_width = 0
@@ -58,7 +62,7 @@ class RecordListViewer(wx.Frame):
                                        )
 
         self.data = []
-        for r in records:
+        for r in self.records:
             #print(r)
             if type(r) in (str, int):
                 record: ArchiveRecord = database_io.get_record_by_id(int(r))
@@ -88,7 +92,8 @@ class RecordListViewer(wx.Frame):
                      record.record_type,
                      record.local_auth,
                      date_range_string,
-                     record.string_tags()
+                     record.string_tags(),
+                     None not in (record.latitude, record.longitude),
                      ]
             if entry[6] == record.tags_prompt:
                 entry[6] = ""
@@ -100,21 +105,35 @@ class RecordListViewer(wx.Frame):
 
         # Add columns
         for i, (h, w) in enumerate(headings):
-            self.dvc.AppendTextColumn(h, i, width=w)
-
-        self.export_button = wx.Button(self, -1, "Export to '.csv'")
-
-        self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
-        self.Bind(wx.EVT_BUTTON, self.export_csv, self.export_button)
-        self.Bind(wx.EVT_CLOSE, self.on_close)
+            if h == "NESW:":
+                self.dvc.AppendToggleColumn(h, i, width=w)
+            else:
+                self.dvc.AppendTextColumn(h, i, width=w)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         sizer.Add(self.dvc, 1, wx.EXPAND)
 
-        sizer.Add(self.export_button, 0)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.export_button = wx.Button(self, wx.NewId(), "Export to Excel", size=(200, 30))
+        button_sizer.AddSpacer(5)
+        button_sizer.Add(self.export_button)
+
+        self.kml_button = wx.Button(self, wx.NewId(), "View Points in Google Earth", size=(200, 30))
+        button_sizer.AddSpacer(5)
+        button_sizer.Add(self.kml_button)
+
+        sizer.AddSpacer(5)
+        sizer.Add(button_sizer, 0)
+        sizer.AddSpacer(5)
 
         self.SetSizer(sizer)
+
+        self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.record_activated, self.dvc)
+        self.Bind(wx.EVT_BUTTON, self.export_csv, self.export_button)
+        self.Bind(wx.EVT_BUTTON, self.export_kml, self.kml_button)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
 
         if not closing:
             self.Show()
@@ -136,20 +155,37 @@ class RecordListViewer(wx.Frame):
                 print("Users Cancelled")
                 return None
             else:
-                pass
+                dest = dlg.GetPath()
+            dlg.Destroy()
         else:
             pass
-        with open(dlg.GetPath(), "w", newline='') as file:
+
+        with open(dest, "w", newline='') as file:
             writer: csv.writer = csv.writer(file, csv.excel)
             for row in self.data:
                 writer.writerow(row)
-        os.startfile(dlg.GetPath())
-        dlg.Destroy()
+        os.startfile(dest)
+
+    def export_kml(self, e):
+        points = []
+        for r in self.records:
+            record: database_io.ArchiveRecord
+            if type(r) in (str, int):
+                record: ArchiveRecord = database_io.get_record_by_id(int(r))
+            else:
+                record = database_io.format_sql_to_record_obj(r)
+
+            # Todo: Add catch for none records. Including removing dead bookmarks.
+            assert record is not None
+            if None not in (record.latitude, record.longitude):
+                points.append((record.title, record.description, record.longitude, record.latitude))
+            else:
+                pass
+        kml_load.load_batch(points)
 
     def on_close(self, event):
         print("Closed")
         self.Destroy()
-
 
 
 def main(title, record_ids):
