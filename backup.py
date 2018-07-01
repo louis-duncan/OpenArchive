@@ -4,8 +4,8 @@ import datetime
 import hashlib
 import shutil
 
-BACKUP_PERIOD = datetime.timedelta(minutes=1)
-NUMBER_OF_BACKUPS_TO_RETAIN = 7
+BACKUP_PERIOD = datetime.timedelta(hours=6)
+NUMBER_OF_BACKUPS_TO_RETAIN = 10
 BACKUPS_DIR = os.path.join(os.path.dirname(database_io.DATABASE_LOCATION), "backups")
 
 
@@ -36,6 +36,19 @@ def get_hash(path):
     except FileNotFoundError:
         return ""
     return file_md5.hexdigest()
+
+
+def purge_old_backups():
+    backups = []
+    for f in os.listdir(BACKUPS_DIR):
+        backups.append((os.path.getctime(os.path.join(BACKUPS_DIR, f)), f))
+    backups.sort()
+    for i, b in enumerate(backups):
+        if i < NUMBER_OF_BACKUPS_TO_RETAIN:
+            pass
+        else:
+            print("Backup: Purging {}".format(b[1]))
+            os.remove(os.path.join(BACKUPS_DIR, b[1]))
 
 
 def check_and_backup():
@@ -81,3 +94,4 @@ def check_and_backup():
             print("Backup: Back-up created at {}".format(os.path.join(BACKUPS_DIR, new_backup_filename)))
     else:
         print("Backup: Not Backing-Up, Backed-up Recently")
+    purge_old_backups()
