@@ -6,6 +6,7 @@ import database_io
 import record_editor
 import wx
 import signal
+import backup
 
 __title__ = "OpenArchive"
 __author__ = "Louis Thurman"
@@ -171,6 +172,7 @@ def main(title):
 if __name__ == "__main__":
     print("PID:",os.getpid())
     print("PPID:",os.getppid())
+    backup.check_and_backup()
     main(__title__)
 else:
     pass
