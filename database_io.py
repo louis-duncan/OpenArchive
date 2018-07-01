@@ -449,8 +449,15 @@ def db_lock(ttl=10):
         caller_name = "{} > {} > {}".format(inspect.stack()[5][3],
                                             inspect.stack()[4][3],
                                             inspect.stack()[3][3])
-    except ValueError:
-        caller_name = "unknown"
+    except IndexError:
+        try:
+            caller_name = "{} > {}".format(inspect.stack()[4][3],
+                                           inspect.stack()[3][3])
+        except IndexError:
+            try:
+                caller_name = "{}".format(inspect.stack()[2][3])
+            except IndexError:
+                caller_name = "unknown"
     print("\nDatabase locked at {} until {} by function:\n{}".format(datetime.datetime.now(), lock_time, caller_name))
 
 
