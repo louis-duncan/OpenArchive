@@ -1121,8 +1121,11 @@ def open_database_connection() -> SQL:
 
 
 # Main Script
-
-load_config()
+try:
+    load_config()
+except FileNotFoundError:
+    easygui.msgbox("Could not load config at {},\nthe program will close.".format(GLOBAL_CONFIG), "OpenArchive")
+    exit()
 
 if os.path.exists(ARCHIVE_LOCATION_ROOT):
     pass
