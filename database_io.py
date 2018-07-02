@@ -46,7 +46,7 @@ class ArchiveRecord:
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
                  start_date=None, end_date=None, physical_ref="", other_ref="", new_tags=[], linked_files=[],
-                 longitude=0.0, latitude=0.0, thumb_files=[], created_by=None, created_time=None, last_changed_by=None,
+                 longitude=None, latitude=None, thumb_files=[], created_by=None, created_time=None, last_changed_by=None,
                  last_changed_time=None):
         self.record_id = record_id
         self.title = title
