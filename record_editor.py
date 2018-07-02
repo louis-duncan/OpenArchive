@@ -197,7 +197,6 @@ class RecordEditor(wx.Frame):
         column_one.Add(self.tags_box, pos=(8, 2), span=(1, 4))
 
         # Lon/Lat Boxes
-        # Todo: Fix new records starting with 0.0, 0.0 as default
         lon_lat_lbl = wx.StaticText(bg_panel, label="Longitude/Latitude:")
         column_one.Add(lon_lat_lbl, (9, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
         self.lon_lat_box = wx.SearchCtrl(bg_panel, size=(220, -1))
