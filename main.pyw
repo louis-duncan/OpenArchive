@@ -73,6 +73,15 @@ Archive Location:
 
         self.Show()
 
+        try:
+            database_io.init()
+        except database_io.DatabaseError:
+            self.database_error_dlg()
+        try:
+            backup.check_and_backup()
+        except database_io.DatabaseError:
+            self.database_error_dlg()
+
     def on_search(self, event):
         search_text = event.GetString()
         search_text = search_text.strip()
@@ -115,28 +124,45 @@ Archive Location:
 
     def launch_record_editor(self):
         # Created Blank Record and loads editor.
+        self.buttons[1].Disable()
         r = database_io.ArchiveRecord()
         r.record_id = "New Record"
-        record_editor.RecordEditor(self, __title__ + " - New Record", r)
+        try:
+            record_editor.RecordEditor(self, __title__ + " - New Record", r)
+        except database_io.DatabaseError:
+            self.database_error_dlg()
+        self.buttons[1].Enable()
 
     def access_users_list(self):
         # Access to users list
         user_name = os.environ["USERNAME"]
-        bookmarks = database_io.get_user_bookmarks(user_name)
-        # Check bookmarks for dead links
-        dead_bookmarks = []
-        for b in bookmarks:
-            test = database_io.get_record_by_id(b)
-            if test is None:
-                database_io.remove_bookmark(user_name, b)
-                dead_bookmarks.append(b)
-        for d in dead_bookmarks:
-            bookmarks.remove(d)
-        record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
-        bookmarks_frame = record_list_viewer.RecordListViewer(self,
-                                                              "{} - User Bookmarks - {}"
-                                                              .format(__title__, user_name.title()), bookmarks)
-        print("Passed")
+        try:
+            bookmarks = database_io.get_user_bookmarks(user_name)
+            # Check bookmarks for dead links
+            dead_bookmarks = []
+            for b in bookmarks:
+                test = database_io.get_record_by_id(b)
+                if test is None:
+                    database_io.remove_bookmark(user_name, b)
+                    dead_bookmarks.append(b)
+            for d in dead_bookmarks:
+                bookmarks.remove(d)
+            record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
+            bookmarks_frame = record_list_viewer.RecordListViewer(self,
+                                                                  "{} - User Bookmarks - {}"
+                                                                  .format(__title__, user_name.title()), bookmarks)
+        except database_io.DatabaseError:
+            self.database_error_dlg()
+
+    def database_error_dlg(self):
+        err_dlg = wx.MessageDialog(self, "Connection to the database timed out.\n"
+                                         "\n"
+                                         "OpenArchive could not open the database file.\n"
+                                         "It has likely been locked by another user,\n"
+                                         "please try again shortly.",
+                                   __title__ + " - Database Error",
+                                   style=wx.OK | wx.CENTER | wx.ICON_ERROR)
+        err_dlg.ShowModal()
 
     def on_close(self, e):
         dlg = wx.MessageDialog(self, "Continue with Close?\n"
@@ -172,7 +198,6 @@ def main(title):
 if __name__ == "__main__":
     print("PID:",os.getpid())
     print("PPID:",os.getppid())
-    backup.check_and_backup()
     main(__title__)
 else:
     pass
