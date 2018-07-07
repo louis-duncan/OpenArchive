@@ -36,8 +36,12 @@ ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 ARCHIVE_INCLUDED_DIRS = []
 # Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
-# Start DateTime from which all dates are calculated as a difference.
+# Start DateTime from which all database dates are calculated as a difference.
 EPOCH = datetime.datetime(1970, 1, 1)
+
+
+class DatabaseError(Exception):
+    pass
 
 
 class ArchiveRecord:
@@ -449,8 +453,15 @@ def db_lock(ttl=10):
         caller_name = "{} > {} > {}".format(inspect.stack()[5][3],
                                             inspect.stack()[4][3],
                                             inspect.stack()[3][3])
-    except ValueError:
-        caller_name = "unknown"
+    except IndexError:
+        try:
+            caller_name = "{} > {}".format(inspect.stack()[4][3],
+                                           inspect.stack()[3][3])
+        except IndexError:
+            try:
+                caller_name = "{}".format(inspect.stack()[2][3])
+            except IndexError:
+                caller_name = "unknown"
     print("\nDatabase locked at {} until {} by function:\n{}".format(datetime.datetime.now(), lock_time, caller_name))
 
 
@@ -487,8 +498,8 @@ def db_prep_for_access(timeout=10):
         else:
             break
         if wait_time > timeout:
-            print("Timed out after {) tries over {} seconds.".format(tries, wait_time))
-            return False
+            print("Timed out after {} tries over {} seconds.".format(tries, wait_time))
+            raise DatabaseError("Connection Timed Out")
         else:
             pass
     db_lock()
@@ -694,8 +705,10 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
 
 
 def return_types():
-    type_records = db_all("SELECT * FROM types", ())
-    # Todo: Add catch for "type_records is False" caused by failed connection.
+    try:
+        type_records = db_all("SELECT * FROM types", ())
+    except DatabaseError:
+        raise
     types = []
     for r in type_records:
         types.append(r.type_text)
@@ -703,8 +716,10 @@ def return_types():
 
 
 def return_local_authorities():
-    local_authority_records = db_all("SELECT * FROM local_authorities", ())
-    # Todo: Add catch for "local_authority_records is False" caused by failed connection.
+    try:
+        local_authority_records = db_all("SELECT * FROM local_authorities", ())
+    except DatabaseError:
+        raise
     local_authorities = []
     for r in local_authority_records:
         local_authorities.append(r.local_auth)
@@ -714,7 +729,7 @@ def return_local_authorities():
 def float_none_drop_other(t):
     if t == "None":
         return "AAAAAAAAAA"
-    elif t.endswith("Other"):
+    elif t.upper().endswith("OTHER"):
         parts = t.split(" ")
         new = ""
         parts.pop(len(parts) - 1)
@@ -1120,58 +1135,59 @@ def open_database_connection() -> SQL:
     return bliss
 
 
-# Main Script
-try:
-    load_config()
-except FileNotFoundError:
-    easygui.msgbox("Could not load config at {},\nthe program will close.".format(GLOBAL_CONFIG), "OpenArchive")
-    exit()
-
-if os.path.exists(ARCHIVE_LOCATION_ROOT):
-    pass
-else:
+def init():
+    # Main Script
     try:
-        os.mkdir(ARCHIVE_LOCATION_ROOT)
-    except:
-        easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
-                       "{}\n"
-                       "\n"
-                       "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
+        load_config()
+    except FileNotFoundError:
+        easygui.msgbox("Could not load config at {},\nthe program will close.".format(GLOBAL_CONFIG), "OpenArchive")
+        exit()
 
-if os.path.exists(ARCHIVE_LOCATION_SUB):
-    pass
-else:
-    try:
-        os.mkdir(ARCHIVE_LOCATION_SUB)
-    except:
-        easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
-                       "{}\n"
-                       "\n"
-                       "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
-
-if os.path.exists(TEMP_DATA_LOCATION):
-    pass
-else:
-    try:
-        os.mkdir(TEMP_DATA_LOCATION)
-    except:
-        easygui.msgbox("OpenArchiveManager could not access or create the temporary data location at:\n"
-                       "{}\n"
-                       "\n"
-                       "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
-
-try:
-    if os.path.exists(DATABASE_LOCATION):
+    if os.path.exists(ARCHIVE_LOCATION_ROOT):
         pass
     else:
+        try:
+            os.mkdir(ARCHIVE_LOCATION_ROOT)
+        except:
+            easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
+                           "{}\n"
+                           "\n"
+                           "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
+
+    if os.path.exists(ARCHIVE_LOCATION_SUB):
+        pass
+    else:
+        try:
+            os.mkdir(ARCHIVE_LOCATION_SUB)
+        except:
+            easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
+                           "{}\n"
+                           "\n"
+                           "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
+
+    if os.path.exists(TEMP_DATA_LOCATION):
+        pass
+    else:
+        try:
+            os.mkdir(TEMP_DATA_LOCATION)
+        except:
+            easygui.msgbox("OpenArchiveManager could not access or create the temporary data location at:\n"
+                           "{}\n"
+                           "\n"
+                           "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
+
+    try:
+        if os.path.exists(DATABASE_LOCATION):
+            pass
+        else:
+            easygui.msgbox("Could not load the database at '{}'\n"
+                           "\n"
+                           "OpenArchive will attempt to start a new database.".format(DATABASE_LOCATION))
+            create_new_database()
+        test_connection = open_database_connection()
+        test_connection.connection.close()
+    except sqlite3.OperationalError:
         easygui.msgbox("Could not load the database at '{}'\n"
                        "\n"
-                       "OpenArchive will attempt to start a new database.".format(DATABASE_LOCATION))
-        create_new_database()
-    test_connection = open_database_connection()
-    test_connection.connection.close()
-except sqlite3.OperationalError:
-    easygui.msgbox("Could not load the database at '{}'\n"
-                   "\n"
-                   "The path may not be valid.".format(DATABASE_LOCATION))
-    exit()
+                       "The path may not be valid.".format(DATABASE_LOCATION))
+        exit()
