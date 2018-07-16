@@ -37,6 +37,7 @@ ARCHIVE_INCLUDED_DIRS = []
 # Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
 # Start DateTime from which all database dates are calculated as a difference.
+BACKUPS_DIR = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "backups"))
 EPOCH = datetime.datetime(1970, 1, 1)
 
 
@@ -226,7 +227,7 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 
 def load_config():
-    global LOCAL_CONFIG, TEMPLATE_LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION
+    global LOCAL_CONFIG, TEMPLATE_LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION, BACKUPS_DIR
 
     local_config = {"GLOBAL_CONFIG": GLOBAL_CONFIG,
                     "TEMP_DATA_LOCATION": TEMP_DATA_LOCATION,
@@ -316,6 +317,7 @@ def load_config():
     ARCHIVE_LOCATION_ROOT = global_config["ARCHIVE_LOCATION_ROOT"]
     ARCHIVE_LOCATION_SUB = global_config["ARCHIVE_LOCATION_SUB"]
     ARCHIVE_INCLUDED_DIRS = listed_incs
+    BACKUPS_DIR = os.path.join(os.path.abspath(ARCHIVE_LOCATION_ROOT), "backups")
 
     # Re-write the config file
     try:
@@ -408,8 +410,8 @@ def create_new_database():
     new_conn.close()
 
 
-def db_run(query, params):
-    bliss = db_prep_for_access()
+def db_run(query, params, pre_lock=False):
+    bliss = db_prep_for_access(pre_lock=pre_lock)
     if bliss is False:
         db_unlock()
         return False
@@ -417,31 +419,40 @@ def db_run(query, params):
         bliss.run(query, params)
         bliss.connection.commit()
         bliss.connection.close()
-        db_unlock()
+        if pre_lock is False:
+            db_unlock()
+        else:
+            pass
         return True
 
 
-def db_all(query, params):
-    bliss = db_prep_for_access()
+def db_all(query, params, pre_lock=False):
+    bliss = db_prep_for_access(pre_lock=pre_lock)
     if bliss is False:
         db_unlock()
         return False
     else:
         result = bliss.all(query, params)
         bliss.connection.close()
-        db_unlock()
+        if pre_lock is False:
+            db_unlock()
+        else:
+            pass
         return result
 
 
-def db_one(query, params):
-    bliss = db_prep_for_access()
+def db_one(query, params, pre_lock=False):
+    bliss = db_prep_for_access(pre_lock=pre_lock)
     if bliss is False:
         db_unlock()
         return False
     else:
         result = bliss.one(query, params)
         bliss.connection.close()
-        db_unlock()
+        if pre_lock is False:
+            db_unlock()
+        else:
+            pass
         return result
 
 
@@ -484,25 +495,28 @@ def db_check_lock_status():
             return ttl
 
 
-def db_prep_for_access(timeout=10):
-    wait_time = 0
-    tries = 0
-    while True:
-        locked = db_check_lock_status()
-        if locked > 0:
-            salt = random.uniform(0, 3)
-            tries += 1
-            print("Try number {} failed. Waiting {} seconds...".format(tries, salt))
-            time.sleep(salt)
-            wait_time += salt
-        else:
-            break
-        if wait_time > timeout:
-            print("Timed out after {} tries over {} seconds.".format(tries, wait_time))
-            raise DatabaseError("Connection Timed Out")
-        else:
-            pass
-    db_lock()
+def db_prep_for_access(timeout=10, pre_lock=False):
+    if pre_lock is False:
+        wait_time = 0
+        tries = 0
+        while True:
+            locked = db_check_lock_status()
+            if locked > 0:
+                salt = random.uniform(0, 3)
+                tries += 1
+                print("Try number {} failed. Waiting {} seconds...".format(tries, salt))
+                time.sleep(salt)
+                wait_time += salt
+            else:
+                break
+            if wait_time > timeout:
+                print("Timed out after {} tries over {} seconds.".format(tries, wait_time))
+                raise DatabaseError("Connection Timed Out")
+            else:
+                pass
+        db_lock()
+    else:
+        pass
     bliss = open_database_connection()
     return bliss
 
@@ -589,65 +603,94 @@ def get_filtered_records(types=(), local_authorities=()):
 
 def format_sql_to_record_obj(db_record_object):
     # Convert Type and Auth ids to text.
-    type_text = db_one("SELECT * FROM types WHERE id=?", (db_record_object.record_type,)).type_text
-    auth_text = db_one("SELECT * FROM local_authorities WHERE id=?", (db_record_object.local_auth,)).local_auth
+    types = db_all("SELECT * FROM types", ())
+    auths = db_all("SELECT * FROM local_authorities", ())
     # Todo: Add catch for "False in (type_text, auth_text) caused by failed connection.
+    if (str(type(db_record_object)) == "<class 'sql.Record'>") or (type(db_record_object in (list, tuple))):
+        if str(type(db_record_object)) == "<class 'sql.Record'>":
+            # If single record obj \/
+            record_objects = [db_record_object]
+        else:
+            # If list or tuple \/
+            record_objects = db_record_object
+        formatted_records = []
+        db_lock(60)
+        for r in record_objects:
+            # Get type and Auth
+            type_text = "ERROR"
+            for t in types:
+                if t.id == r.record_type:
+                    type_text = t.type_text
+                else:
+                    pass
+            auth_text = "ERROR"
+            for a in auths:
+                if a.id == r.local_auth:
+                    auth_text = a.local_auth
+                else:
+                    pass
+            # Convert dates to datetimes
+            if r.start_date is None:
+                start_date = None
+            else:
+                start_date = EPOCH + datetime.timedelta(milliseconds=r.start_date)
+            if r.end_date is None:
+                end_date = None
+            else:
+                end_date = EPOCH + datetime.timedelta(milliseconds=r.end_date)
+            if r.created_time is None:
+                created_time = None
+            else:
+                created_time = EPOCH + datetime.timedelta(milliseconds=r.created_time)
+            if r.last_changed_time is None:
+                last_changed_time = None
+            else:
+                last_changed_time = EPOCH + datetime.timedelta(milliseconds=r.last_changed_time)
 
-    # Convert dates to datetimes
-    if db_record_object.start_date is None:
-        start_date = None
-    else:
-        start_date = EPOCH + datetime.timedelta(milliseconds=db_record_object.start_date)
-    if db_record_object.end_date is None:
-        end_date = None
-    else:
-        end_date = EPOCH + datetime.timedelta(milliseconds=db_record_object.end_date)
-    if db_record_object.created_time is None:
-        created_time = None
-    else:
-        created_time = EPOCH + datetime.timedelta(milliseconds=db_record_object.created_time)
-    if db_record_object.last_changed_time is None:
-        last_changed_time = None
-    else:
-        last_changed_time = EPOCH + datetime.timedelta(milliseconds=db_record_object.last_changed_time)
+            # Create tag and item lists
+            if r.tags is not None:
+                tags = r.tags.split("|")
+                while tags.count("") > 0:
+                    tags.remove("")
+            else:
+                tags = None
 
-    # Create tag and item lists
-    if db_record_object.tags is not None:
-        tags = db_record_object.tags.split("|")
-        while tags.count("") > 0:
-            tags.remove("")
+            linked_files = []
+            thumb_files = []
+            record_file_links = db_all("SELECT * FROM file_links WHERE record_id=?", (r.id,), pre_lock=True)
+            # Todo: Add catch for "record_file_links is False" caused by failed connection.
+            for f in record_file_links:
+                linked_files.append(f.file_path)
+                thumb_files.append(f.thumbnail_path)
+
+            # Create Record obj
+            new_record = ArchiveRecord(record_id=r.id,
+                                       title=r.title,
+                                       description=r.description,
+                                       record_type=type_text,
+                                       local_auth=auth_text,
+                                       start_date=start_date,
+                                       end_date=end_date,
+                                       physical_ref=r.physical_ref,
+                                       other_ref=r.other_ref,
+                                       new_tags=tags,
+                                       linked_files=linked_files,
+                                       longitude=r.longitude,
+                                       latitude=r.latitude,
+                                       thumb_files=thumb_files,
+                                       created_by=r.created_by,
+                                       created_time=created_time,
+                                       last_changed_by=r.last_changed_by,
+                                       last_changed_time=last_changed_time,
+                                       )
+            formatted_records.append(new_record)
+        db_unlock()
+        if len(formatted_records) == 1:
+            return formatted_records[0]
+        else:
+            return formatted_records
     else:
-        tags = None
-
-    linked_files = []
-    thumb_files = []
-    record_file_links = db_all("SELECT * FROM file_links WHERE record_id=?", (db_record_object.id,))
-    # Todo: Add catch for "record_file_links is False" caused by failed connection.
-    for f in record_file_links:
-        linked_files.append(f.file_path)
-        thumb_files.append(f.thumbnail_path)
-
-    # Create Record obj
-    record_obj = ArchiveRecord(record_id=db_record_object.id,
-                               title=db_record_object.title,
-                               description=db_record_object.description,
-                               record_type=type_text,
-                               local_auth=auth_text,
-                               start_date=start_date,
-                               end_date=end_date,
-                               physical_ref=db_record_object.physical_ref,
-                               other_ref=db_record_object.other_ref,
-                               new_tags=tags,
-                               linked_files=linked_files,
-                               longitude=db_record_object.longitude,
-                               latitude=db_record_object.latitude,
-                               thumb_files=thumb_files,
-                               created_by=db_record_object.created_by,
-                               created_time=created_time,
-                               last_changed_by=db_record_object.last_changed_by,
-                               last_changed_time=last_changed_time,
-                               )
-    return record_obj
+        raise TypeError("Record did not conform to type requirements.")
 
 
 def format_record_obj_to_sql(record_obj: ArchiveRecord):
@@ -967,16 +1010,24 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
     # Todo: Add catch for "base_list is False" caused by failed connection.
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(base_list, text)
-        return scored_results
+        if resource_type is local_auth is start_date is end_date is None:
+            print("No search limits, suspected quick search, showing top 100.")
+            return scored_results[0:100]
+        else:
+            return scored_results
     else:
         return base_list
 
 
 def move_file_to_archive(cached_path=""):
-    new_root = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
-    new_full_path = os.path.abspath(os.path.join(new_root, os.path.basename(cached_path)))
+    new_dir = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
+    new_full_path = os.path.abspath(os.path.join(new_dir, os.path.basename(cached_path)))
     suc = shutil.copy2(cached_path, new_full_path)
-    os.remove(cached_path)
+    if os.path.abspath(cached_path).startswith(os.path.abspath(TEMP_DATA_LOCATION)):
+        os.remove(cached_path)
+        print("Deleting {} from cache.".format(cached_path))
+    else:
+        pass
     return suc
 
 
@@ -1026,7 +1077,7 @@ def score_results(results, text):
                 pass
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
         score = round(score, 1)
-        print(r.id, score)
+        #print(r.id, score)
         if score == 0.0:
             pass
         else:
@@ -1141,7 +1192,7 @@ def init():
         load_config()
     except FileNotFoundError:
         easygui.msgbox("Could not load config at {},\nthe program will close.".format(GLOBAL_CONFIG), "OpenArchive")
-        exit()
+        raise
 
     if os.path.exists(ARCHIVE_LOCATION_ROOT):
         pass
@@ -1153,6 +1204,7 @@ def init():
                            "{}\n"
                            "\n"
                            "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
+            raise
 
     if os.path.exists(ARCHIVE_LOCATION_SUB):
         pass
@@ -1164,6 +1216,7 @@ def init():
                            "{}\n"
                            "\n"
                            "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
+            raise
 
     if os.path.exists(TEMP_DATA_LOCATION):
         pass
@@ -1175,6 +1228,7 @@ def init():
                            "{}\n"
                            "\n"
                            "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
+            raise
 
     try:
         if os.path.exists(DATABASE_LOCATION):
@@ -1190,4 +1244,4 @@ def init():
         easygui.msgbox("Could not load the database at '{}'\n"
                        "\n"
                        "The path may not be valid.".format(DATABASE_LOCATION))
-        exit()
+        raise
