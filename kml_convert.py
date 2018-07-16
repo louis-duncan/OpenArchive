@@ -1,3 +1,4 @@
+import datetime
 import os
 import coord
 try:
@@ -5,7 +6,8 @@ try:
 except ModuleNotFoundError:
     print("Could not load database_io!")
 
-class point:
+
+class Point:
     def __init__(self, name="", description="", linked_files=[], longitude=0, latitude=0):
         self.name = name
         self.description = description
@@ -15,8 +17,9 @@ class point:
         
     def add_link(self, path):
         self.linked_files.append(path)
-        
-def get_kml_data(path):
+
+
+def load_kml_data(path):
     with open(path, "r") as fh:
         data = fh.readlines()
     return data
@@ -60,7 +63,7 @@ def decode_description(text):
     
 def process_points(data_lines):
     points = []
-    current_point = point()
+    current_point = Point()
     in_point = False
     in_name = False
     in_description = False
@@ -70,7 +73,7 @@ def process_points(data_lines):
         
         # Start new points and save finished points.
         if raw_line == "<Placemark>":
-            current_point = point()
+            current_point = Point()
             in_point = True
             in_name = False
             in_description = False
@@ -145,11 +148,48 @@ def process_points(data_lines):
     return points
 
 
-def convert_points_to_records(points):
+def convert_points_to_records(points,
+                              title_prefix="",
+                              title_suffix="",
+                              description_prefix="",
+                              description_suffix="",
+                              record_type=0,
+                              local_auth=0,
+                              tags=list(),
+                              ):
     new_records = []
 
+    p: Point
     for p in points:
-        pass
+        if len(p.linked_files) == 0:
+            print("{} skipped due to having no files linked.".format(p.name))
+        else:
+            skip = False
+            for f in p.linked_files:
+                if os.path.exists(f):
+                    pass
+                else:
+                    skip = True
+            if skip:
+                print("{} skipped due to having an invalid file.".format(p.name))
+            else:
+                new_records.append(database_io.ArchiveRecord(record_id=None,
+                                                             title="{}{}{}".format(title_prefix,
+                                                                                   p.name,
+                                                                                   title_suffix),
+                                                             description="{}{}{}".format(description_prefix,
+                                                                                         p.description,
+                                                                                         description_suffix),
+                                                             record_type=record_type,
+                                                             local_auth=local_auth,
+                                                             start_date=None,
+                                                             end_date=None,
+                                                             new_tags=tags,
+                                                             linked_files=p.linked_files,
+                                                             longitude=p.longitude,
+                                                             latitude=p.latitude
+                                                             ))
+    return new_records
 
 
 if __name__ == "__main__":
