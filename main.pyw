@@ -14,7 +14,6 @@ __author__ = "Louis Thurman"
 
 class LaunchPad(wx.Frame):
     def __init__(self, parent, title):
-
         window_size = (500, 280)
         wx.Frame.__init__(self, parent, title=title, size=window_size,
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
@@ -23,15 +22,8 @@ class LaunchPad(wx.Frame):
         bg_panel = wx.Panel(self, size=window_size)
 
         self.choices = ["Detailed Search", "Create New Record", "View My List"]
-        msg = """- Welcome to OpenArchive -
 
-Database File:
-{}
-
-Archive Location:
-{}""".format(database_io.DATABASE_LOCATION.replace("&", "&&"), database_io.ARCHIVE_LOCATION_ROOT.replace("&", "&&"))
-
-        msg_lbl = wx.StaticText(bg_panel, label=msg, style=wx.ALIGN_CENTER)
+        msg_lbl = wx.StaticText(bg_panel, label="Loading...", style=wx.ALIGN_CENTER)
 
         button_size = (130, 40)
 
@@ -82,6 +74,19 @@ Archive Location:
         except database_io.DatabaseError:
             self.database_error_dlg()
 
+        msg = """- Welcome to OpenArchive -
+
+        Database File:
+        {}
+
+        Archive Location:
+        {}""".format(database_io.DATABASE_LOCATION.replace("&", "&&"),
+                     database_io.ARCHIVE_LOCATION_ROOT.replace("&", "&&"))
+
+        msg_lbl.SetLabel(msg)
+
+        self.Layout()
+
     def on_search(self, event):
         search_text = event.GetString()
         search_text = search_text.strip()
@@ -94,8 +99,6 @@ Archive Location:
 
     def quick_search(self, search_text):
         results = database_io.search_archive(search_text)
-        for r in results:
-            print(r.id)
         view_frame = record_list_viewer.RecordListViewer(self, __title__, results)
 
     def button_pressed(self, e):
@@ -140,17 +143,21 @@ Archive Location:
             bookmarks = database_io.get_user_bookmarks(user_name)
             # Check bookmarks for dead links
             dead_bookmarks = []
+            bookmark_records = []
             for b in bookmarks:
                 test = database_io.get_record_by_id(b)
                 if test is None:
                     database_io.remove_bookmark(user_name, b)
                     dead_bookmarks.append(b)
+                else:
+                    bookmark_records.append(test)
             for d in dead_bookmarks:
                 bookmarks.remove(d)
-            record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
+            # record_list_viewer.main("{} - User Bookmarks - {}".format(__title__, user_name.title()), bookmarks)
             bookmarks_frame = record_list_viewer.RecordListViewer(self,
                                                                   "{} - User Bookmarks - {}"
-                                                                  .format(__title__, user_name.title()), bookmarks)
+                                                                  .format(__title__, user_name.title()),
+                                                                  bookmark_records)
         except database_io.DatabaseError:
             self.database_error_dlg()
 
