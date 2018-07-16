@@ -103,7 +103,8 @@ def normalise(text: str):
     if is_nesw:
         lon, lat = nesw_to_coord(text)
     else:
-        lon, lat = text.split(",")
+        parts = text.split(",")
+        lon, lat = parts[0], parts[1]
         lon = float(lon.strip())
         lat = float(lat.strip())
 
@@ -118,6 +119,8 @@ def validate(text: str):
         print("ValueError in coord check.")
     except AssertionError:
         print("Assertion Error in coord check")
+    except IndexError:
+        print("Index Error in coord check")
     return False
 
 
