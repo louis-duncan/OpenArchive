@@ -61,17 +61,17 @@ class RecordListViewer(wx.Frame):
                                              | dv.DV_VARIABLE_LINE_HEIGHT
                                        )
 
+        # Format records.
+        assert (type(records[0]) == database_io.ArchiveRecord) or (str(type(records[0])) == "<class 'sql.Record'>")
+        assert None not in records
+        if type(records[0]) == database_io.ArchiveRecord:
+            pass
+        else:
+            print("Records are sql objects, formatting...")
+            self.records = database_io.format_sql_to_record_obj(self.records)
+
         self.data = []
-        for r in self.records:
-            #print(r)
-            if type(r) in (str, int):
-                record: ArchiveRecord = database_io.get_record_by_id(int(r))
-            else:
-                record = database_io.format_sql_to_record_obj(r)
-
-            # Todo: Add catch for none records. Including removing dead bookmarks.
-            assert record is not None
-
+        for record in self.records:
             dates = []
             date_range_string = ""
             if record.start_date is not None:
