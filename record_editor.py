@@ -239,7 +239,7 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.upload_multiple_button = wx.Button(bg_panel, size=(100, -1), label="Upload Many\nAs One PDF")
         self.upload_multiple_button.SetToolTip(wx.ToolTip("Merges multiple image files into a single PDF file\n"
-                                                          "then links it to the record as a single entry."))
+                                                          "then link it to the record as a single entry."))
         file_buttons_sizer.Add(self.upload_multiple_button)
         file_buttons_sizer.Add((0, 0), wx.EXPAND)
         self.remove_file_button = wx.Button(bg_panel, size=(100, -1), label="Unlink\nFile")
