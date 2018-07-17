@@ -7,7 +7,7 @@ import subprocess
 import database_io
 import textdistance
 
-__title__ = "OpenArchive - Detailed Search"
+__title__ = "OpenArchive"
 
 
 class FileLinkPopupMenu(wx.Menu):
@@ -72,15 +72,13 @@ class DetailedSearch(wx.Frame):
         frame_width = 600
         frame_height = 500
 
-        wx.Frame.__init__(self, parent, title=title, size=(frame_width, frame_height),
-
+        wx.Frame.__init__(self, parent, title=title + " - Detailed Search", size=(frame_width, frame_height),
                           style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
 
         # Add bg panel
         bg_panel = wx.Panel(self, size=(frame_width, frame_height))
 
         header = wx.StaticText(bg_panel, label="   Fill boxes as required to refine your search:")
-        header.SetForegroundColour("Blue")
 
         row_one = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -110,7 +108,6 @@ class DetailedSearch(wx.Frame):
         row_sizer.AddSpacer(10)
         row_sizer.Add(row_one)
         row_sizer.AddSpacer(10)
-        row_sizer.Add(sep)
 
         self.SetSizer(row_sizer)
         self.create_binds()
