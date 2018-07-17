@@ -64,12 +64,14 @@ class RecordListViewer(wx.Frame):
         # Format records.
         assert (type(records[0]) == database_io.ArchiveRecord) or (str(type(records[0])) == "<class 'sql.Record'>")
         assert None not in records
-        if type(records[0]) == database_io.ArchiveRecord:
+        if type(self.records[0]) == database_io.ArchiveRecord:
             pass
+        elif type(self.records) == database_io.ArchiveRecord:
+            self.records = [self.records]
         else:
             print("Records are sql objects, formatting...")
             self.records = database_io.format_sql_to_record_obj(self.records)
-
+        assert type(self.records) in (list, tuple)
         self.data = []
         for record in self.records:
             dates = []
