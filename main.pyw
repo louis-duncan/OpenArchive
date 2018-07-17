@@ -1,10 +1,11 @@
 import os
 import time
 import easygui
+import wx
 import record_list_viewer
 import database_io
 import record_editor
-import wx
+import detailed_search
 import signal
 import backup
 
@@ -101,6 +102,14 @@ class LaunchPad(wx.Frame):
         results = database_io.search_archive(search_text)
         view_frame = record_list_viewer.RecordListViewer(self, __title__, results)
 
+    def detailed_search(self):
+        pass
+        # Get user input.
+        # Perform search.
+        # Display results.
+        # todo: Write detailed search
+        detailed_search_frame = detailed_search.DetailedSearch(self, __title__)
+
     def button_pressed(self, e):
         lbl_pressed = e.GetEventObject().Label
         if lbl_pressed == self.choices[0]:
@@ -111,19 +120,6 @@ class LaunchPad(wx.Frame):
             self.access_users_list()
         else:
             pass
-
-    def detailed_search(self):
-        pass
-        # Get user input.
-        # Perform search.
-        # Display results.
-        # todo: Write detailed search
-        #dlg = wx.MessageDialog(self, "Inactive Feature!\n"
-        #                                    "\n"
-        #                                    "Detailed searched are not currently in operation.",
-        #                       __title__)
-        #dlg.ShowModal()
-        #dlg.Destroy()
 
     def launch_record_editor(self):
         # Created Blank Record and loads editor.
