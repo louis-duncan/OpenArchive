@@ -170,13 +170,8 @@ class RecordListViewer(wx.Frame):
 
     def export_kml(self, e):
         points = []
-        for r in self.records:
-            record: database_io.ArchiveRecord
-            if type(r) in (str, int):
-                record: ArchiveRecord = database_io.get_record_by_id(int(r))
-            else:
-                record = database_io.format_sql_to_record_obj(r)
-
+        assert type(self.records[0]) == database_io.ArchiveRecord
+        for record in self.records:
             # Todo: Add catch for none records. Including removing dead bookmarks.
             assert record is not None
             if None not in (record.latitude, record.longitude):
