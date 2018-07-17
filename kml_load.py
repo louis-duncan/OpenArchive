@@ -37,6 +37,7 @@ def create_kml_point(title, description, lon, lat):
     new_point = new_point.replace("description-here", description)
     new_point = new_point.replace("lon-here", str(lon))
     new_point = new_point.replace("lat-here", str(lat))
+    new_point = new_point.replace("&", "&amp;")
     return new_point
 
 
