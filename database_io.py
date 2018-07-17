@@ -1011,8 +1011,8 @@ def search_archive(text="", resource_type=None, local_auth=None, start_date=None
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(base_list, text)
         if resource_type is local_auth is start_date is end_date is None:
-            print("No search limits, suspected quick search, showing top 100.")
-            return scored_results[0:100]
+            print("No search limits, suspected quick search, showing top 50.")
+            return scored_results[0:50]
         else:
             return scored_results
     else:
