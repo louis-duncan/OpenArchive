@@ -21,7 +21,7 @@ import temp
 
 import kml_load
 
-MAP_MODE="GOOGLE EARTH"
+MAP_MODE = "GOOGLE EARTH"
 
 PIL.ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -521,11 +521,11 @@ Degrees, Minutes, Seconds (eg. 03°08'29.72"W 26°32'09.20"N)"""
         assert coord.validate(self.lon_lat_box.GetValue().strip()) is True
         if MAP_MODE.upper() == "GOOGLE EARTH":
             lon, lat = coord.normalise(self.lon_lat_box.GetValue().strip())
-            kml_load.create_kml_point(self.title_box.GetValue().strip(),
-                                      self.desc_box.GetValue().strip(),
-                                      lon,
-                                      lat,
-                                      self.cache_dir)
+            point = kml_load.create_kml_point(self.title_box.GetValue().strip(),
+                                              self.desc_box.GetValue().strip(),
+                                              lon,
+                                              lat)
+            kml_load.launch(point)
         else:
             lon, lat = coord.normalise(self.lon_lat_box.GetValue().strip())
             url = "https://www.google.com/maps/?q={},{}".format(lat, lon)
