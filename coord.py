@@ -1,3 +1,5 @@
+import math
+
 def coord_to_nesw(lon, lat):
     """Converts lon/lat to 1°2'3" E 1°2'3" N"""
     # Lon
@@ -138,4 +140,14 @@ def multi_split(text, seps=(",",)):
     return output
 
 
-
+def distance(start, end):
+    """Calc distance between start and end, start and end should be (lon, lat)"""
+    R = 6364900  # Earth redius for central UK, metres
+    φ1 = math.radians(start[1])
+    φ2 = math.radians(end[1])
+    Δφ = math.radians(end[1] - start[1])
+    Δλ = math.radians(end[0] - start[0])
+    a = math.sin(Δφ/2) * math.sin(Δφ/2) + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ/2) * math.sin(Δλ/2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    d = R * c
+    return d
