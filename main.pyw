@@ -31,7 +31,7 @@ class LaunchPad(wx.Frame):
         self.quick_search_box = wx.SearchCtrl(bg_panel,
                                               size=((3 * button_size[0]) + ((len(self.choices) - 1) * 10), -1),
                                               style=wx.TE_PROCESS_ENTER)
-        self.quick_search_box.SetDescriptiveText("Quick Search")
+        self.quick_search_box.SetDescriptiveText("Broad Search...")
         self.Bind(wx.EVT_SEARCHCTRL_SEARCH_BTN, self.on_search, self.quick_search_box)
         self.Bind(wx.EVT_TEXT_ENTER, self.on_search, self.quick_search_box)
 
@@ -48,7 +48,7 @@ class LaunchPad(wx.Frame):
                 button_sizer.AddSpacer(10)
 
         # Disable Detailed Search Button
-        self.buttons[0].Disable()
+        #self.buttons[0].Disable()
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.AddSpacer(10)
