@@ -142,12 +142,17 @@ def multi_split(text, seps=(",",)):
 
 def distance(start, end):
     """Calc distance between start and end, start and end should be (lon, lat)"""
-    R = 6364900  # Earth redius for central UK, metres
-    φ1 = math.radians(start[1])
-    φ2 = math.radians(end[1])
-    Δφ = math.radians(end[1] - start[1])
-    Δλ = math.radians(end[0] - start[0])
-    a = math.sin(Δφ/2) * math.sin(Δφ/2) + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ/2) * math.sin(Δλ/2)
+    earth_radius = 6364900  # Earth radius for central UK, metres
+    lat1 = math.radians(start[1])
+    lat2 = math.radians(end[1])
+    lat_delta = math.radians(end[1] - start[1])
+    lon_delta = math.radians(end[0] - start[0])
+    a = math.sin(lat_delta/2) *\
+        math.sin(lat_delta/2) +\
+        math.cos(lat1) *\
+        math.cos(lat2) *\
+        math.sin(lon_delta/2) *\
+        math.sin(lon_delta/2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    d = R * c
+    d = earth_radius * c
     return d
