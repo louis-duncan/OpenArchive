@@ -78,38 +78,85 @@ class DetailedSearch(wx.Frame):
         # Add bg panel
         bg_panel = wx.Panel(self, size=(frame_width, frame_height))
 
-        header = wx.StaticText(bg_panel, label="   Fill boxes as required to refine your search:")
+        #header = wx.StaticText(bg_panel, label="Detailed Search:")
 
         row_one = wx.BoxSizer(wx.HORIZONTAL)
-
         # Record ID
-        row_one.AddSpacer(10)
         record_id_lbl = wx.StaticText(bg_panel, label="Record ID:")
         row_one.Add(record_id_lbl, flag=wx.ALIGN_CENTRE_VERTICAL | wx.TOP, border=2)
         self.record_id_box = wx.TextCtrl(bg_panel, size=(50, -1))
         record_id_tip_msg = """Number only.
-        If an ID is entered here """
+If an ID is entered here, no other search options will be available."""
         record_id_tip = wx.ToolTip(record_id_tip_msg)
         self.record_id_box.SetToolTip(record_id_tip)
         row_one.AddSpacer(10)
         row_one.Add(self.record_id_box, flag=wx.ALIGN_CENTRE_VERTICAL)
 
+        row_two = wx.BoxSizer(wx.HORIZONTAL)
         # Free Text
-        row_one.AddSpacer(20)
         free_text_lbl = wx.StaticText(bg_panel, label="Free Text:")
-        row_one.Add(free_text_lbl, flag=wx.ALIGN_CENTRE_VERTICAL | wx.TOP, border=2)
+        row_two.Add(free_text_lbl, flag=wx.ALIGN_CENTRE_VERTICAL | wx.TOP, border=2)
         self.free_text_box = wx.TextCtrl(bg_panel, size=(300, -1))
-        row_one.AddSpacer(10)
-        row_one.Add(self.free_text_box, flag=wx.ALIGN_CENTRE_VERTICAL)
+        row_two.AddSpacer(10)
+        row_two.Add(self.free_text_box, flag=wx.ALIGN_CENTRE_VERTICAL)
 
+        # Search filters
+        filters_panel = wx.Panel(bg_panel, size=(400, 200), style=wx.BORDER_SUNKEN)
+
+        filters_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Types Filter
+        type_lbl = wx.StaticText(filters_panel, label="Resource Type:")
+        record_types = database_io.return_types()
+        record_types.sort(key=database_io.float_none_drop_other)
+        self.types_comb = wx.ComboBox(filters_panel, size=(350, -1), choices=record_types, value="None",
+                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
+        filters_sizer.AddSpacer(10)
+        filters_sizer.Add(type_lbl)
+        filters_sizer.Add(self.types_comb)
+
+        # Auths Filter
+        record_auths = database_io.return_local_authorities()
+        record_auths.sort(key=database_io.float_none_drop_other)
+        self.auths_comb = wx.ComboBox(filters_panel, size=(350, -1), choices=record_auths, value="None",
+                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
+        filters_sizer.AddSpacer(10)
+        filters_sizer.Add(self.auths_comb)
+
+        filters_sizer.AddSpacer(10)
+
+        filters_padder = wx.BoxSizer(wx.HORIZONTAL)
+        filters_padder.AddSpacer(10)
+        filters_padder.Add(filters_sizer)
+        filters_padder.AddSpacer(10)
+
+        filters_panel.SetSizerAndFit(filters_padder)
+
+
+        # Add rows to column
         row_sizer = wx.BoxSizer(wx.VERTICAL)
+        #row_sizer.AddSpacer(10)
+        #row_sizer.Add(header)
         row_sizer.AddSpacer(10)
-        row_sizer.Add(header)
+        row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
         row_sizer.AddSpacer(10)
         row_sizer.Add(row_one)
         row_sizer.AddSpacer(10)
+        row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
+        row_sizer.AddSpacer(10)
+        row_sizer.Add(row_two)
+        row_sizer.AddSpacer(10)
+        row_sizer.Add(wx.StaticText(bg_panel, label="Filters:"))
+        row_sizer.Add(filters_panel)
 
-        self.SetSizer(row_sizer)
+        row_sizer.AddSpacer(20)
+
+        col_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        col_sizer.AddSpacer(10)
+        col_sizer.Add(row_sizer)
+        col_sizer.AddSpacer(20)
+
+        self.SetSizerAndFit(col_sizer)
         self.create_binds()
 
         self.Show(True)
@@ -131,4 +178,5 @@ def main(title=__title__):
 
 
 if __name__ == "__main__":
+    database_io.init()
     main()
