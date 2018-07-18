@@ -103,34 +103,31 @@ If an ID is entered here, no other search options will be available."""
         # Search filters
         filters_panel = wx.Panel(bg_panel, size=(400, 200), style=wx.BORDER_SUNKEN)
 
-        filters_sizer = wx.BoxSizer(wx.VERTICAL)
+        filters_sizer = wx.GridBagSizer(10, 10)
+
+        filters_sizer.Add((0, 0), pos=(0, 0))
 
         # Types Filter
-        type_lbl = wx.StaticText(filters_panel, label="Resource Type:")
+        self. type_lbl = wx.StaticText(filters_panel, label="Resource Type:")
         record_types = database_io.return_types()
         record_types.sort(key=database_io.float_none_drop_other)
         self.types_comb = wx.ComboBox(filters_panel, size=(350, -1), choices=record_types, value="None",
                                       style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        filters_sizer.AddSpacer(10)
-        filters_sizer.Add(type_lbl)
-        filters_sizer.Add(self.types_comb)
+        filters_sizer.Add(self.type_lbl, (1, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        filters_sizer.Add(self.types_comb, (1, 2))
 
         # Auths Filter
+        self.auth_lbl = wx.StaticText(filters_panel, label="Source/Local Authority:")
         record_auths = database_io.return_local_authorities()
         record_auths.sort(key=database_io.float_none_drop_other)
         self.auths_comb = wx.ComboBox(filters_panel, size=(350, -1), choices=record_auths, value="None",
                                       style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        filters_sizer.AddSpacer(10)
-        filters_sizer.Add(self.auths_comb)
+        filters_sizer.Add(self.auth_lbl, (2, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+        filters_sizer.Add(self.auths_comb, (2, 2))
 
-        filters_sizer.AddSpacer(10)
+        filters_sizer.Add((0, 0), pos=(3, 3))
 
-        filters_padder = wx.BoxSizer(wx.HORIZONTAL)
-        filters_padder.AddSpacer(10)
-        filters_padder.Add(filters_sizer)
-        filters_padder.AddSpacer(10)
-
-        filters_panel.SetSizerAndFit(filters_padder)
+        filters_panel.SetSizerAndFit(filters_sizer)
 
 
         # Add rows to column
@@ -169,6 +166,7 @@ If an ID is entered here, no other search options will be available."""
 
     def close_button_press(self, e):
         self.Destroy()
+        pass
 
 
 def main(title=__title__):
