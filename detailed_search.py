@@ -166,6 +166,13 @@ If an ID is entered here, no other search options will be available."""
 
         # Close Frame
         self.Bind(wx.EVT_CLOSE, self.close_button_press)
+        self.Bind(wx.EVT_TEXT, self.record_id_changed, self.record_id_box)
+
+    def record_id_changed(self, event):
+        if self.record_id_box.GetValue() != "":
+            self.disable_filters()
+        else:
+            self.enable_filters()
 
     def disable_filters(self):
         self.free_text_lbl.Disable()
