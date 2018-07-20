@@ -101,56 +101,57 @@ If an ID is entered here, no other search options will be available."""
         row_two.Add(self.free_text_box, flag=wx.ALIGN_CENTRE_VERTICAL)
 
         # Search filters
-        self.filters_lbl = wx.StaticText(bg_panel, label="Filters:")
+        #self.filters_lbl = wx.StaticText(bg_panel, label="Filters:")
 
-        self.filters_panel = wx.Panel(bg_panel, size=(400, 200), style=wx.BORDER_SUNKEN)
+        self.filters_panel = wx.StaticBox(bg_panel, size=(400, 200), label="Filters:")
 
-        filters_sizer = wx.GridBagSizer(10, 10)
-
-        filters_sizer.Add((0, 0), pos=(0, 0))
+        filters_sizer = wx.GridBagSizer(0, 0)
 
         # Types Filter
-        type_lbl = wx.StaticText(self.filters_panel, label="Resource Type:")
-        record_types = database_io.return_types()
-        record_types.sort(key=database_io.float_none_drop_other)
-        record_types.insert(0, "Select...")
-        types_comb = wx.ComboBox(self.filters_panel, size=(350, -1), choices=record_types, value=record_types[0],
-                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        filters_sizer.Add(type_lbl, (1, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-        filters_sizer.Add(types_comb, (1, 2))
+        type_lbl = wx.StaticText(self.filters_panel, label="Resource Types:")
+        self.record_types = database_io.return_types()
+        self.record_types.sort(key=database_io.float_none_drop_other)
+        for i in range(20):
+            self.record_types.append("Test Line {}".format(i + 1))
+        self.types_multi_choice = wx.CheckListBox(self.filters_panel, size=(300, 80), choices=self.record_types)
+        filters_sizer.Add(type_lbl, (0, 0))
+        filters_sizer.Add(self.types_multi_choice, (1, 0), span=(3, 1))
+        self.check_all_types_button = wx.Button(self.filters_panel, label="Select All")
+        filters_sizer.Add(self.check_all_types_button, (1, 2))
+        self.clear_all_types_button = wx.Button(self.filters_panel, label="Clear All")
+        filters_sizer.Add(self.clear_all_types_button, (3, 2))
 
         # Auths Filter
-        auth_lbl = wx.StaticText(self.filters_panel, label="Source/Local Authority:")
-        record_auths = database_io.return_local_authorities()
-        record_auths.sort(key=database_io.float_none_drop_other)
-        record_auths.insert(0, "Select...")
-        auths_comb = wx.ComboBox(self.filters_panel, size=(350, -1), choices=record_auths, value=record_auths[0],
-                                      style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        filters_sizer.Add(auth_lbl, (2, 1), flag=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-        filters_sizer.Add(auths_comb, (2, 2))
+        auth_lbl = wx.StaticText(self.filters_panel, label="Sources/Local Authorities:")
+        self.record_auths = database_io.return_local_authorities()
+        self.record_auths.sort(key=database_io.float_none_drop_other)
+        self.auths_multi_choice = wx.CheckListBox(self.filters_panel, size=(300, 80), choices=self.record_auths)
+        filters_sizer.Add(auth_lbl, (5, 0))
+        filters_sizer.Add(self.auths_multi_choice, (6, 0), span=(3, 1))
+        self.check_all_auths_button = wx.Button(self.filters_panel, label="Select All")
+        filters_sizer.Add(self.check_all_auths_button, (6, 2))
+        self.clear_all_auths_button = wx.Button(self.filters_panel, label="Clear All")
+        filters_sizer.Add(self.clear_all_auths_button, (8, 2))
 
-        filters_sizer.Add((0, 0), pos=(3, 3))
-
-        self.filters_panel.SetSizerAndFit(filters_sizer)
+        filters_pad = wx.BoxSizer()
+        filters_pad.Add(filters_sizer, 1, wx.EXPAND | wx.ALL, 20)
+        self.filters_panel.SetSizerAndFit(filters_pad)
 
         # Add rows to column
         row_sizer = wx.BoxSizer(wx.VERTICAL)
         #row_sizer.AddSpacer(10)
         #row_sizer.Add(header)
-        row_sizer.AddSpacer(10)
+        row_sizer.AddSpacer(15)
         row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
-        row_sizer.AddSpacer(10)
+        row_sizer.AddSpacer(15)
         row_sizer.Add(row_one)
-        row_sizer.AddSpacer(10)
+        row_sizer.AddSpacer(15)
         row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
-        row_sizer.AddSpacer(10)
+        row_sizer.AddSpacer(20)
         row_sizer.Add(row_two)
         row_sizer.AddSpacer(10)
-        row_sizer.Add(self.filters_lbl)
         row_sizer.Add(self.filters_panel)
-
         row_sizer.AddSpacer(20)
-
         col_sizer = wx.BoxSizer(wx.HORIZONTAL)
         col_sizer.AddSpacer(10)
         col_sizer.Add(row_sizer)
@@ -164,9 +165,31 @@ If an ID is entered here, no other search options will be available."""
     def create_binds(self):
         # Bind Data Entry
 
+        # Bind Button Presses
+        self.Bind(wx.EVT_BUTTON, self.select_all_types, self.check_all_types_button)
+        self.Bind(wx.EVT_BUTTON, self.clear_all_types, self.clear_all_types_button)
+        self.Bind(wx.EVT_BUTTON, self.select_all_auths, self.check_all_auths_button)
+        self.Bind(wx.EVT_BUTTON, self.clear_all_auths, self.clear_all_auths_button)
+
         # Close Frame
         self.Bind(wx.EVT_CLOSE, self.close_button_press)
         self.Bind(wx.EVT_TEXT, self.record_id_changed, self.record_id_box)
+
+    def select_all_types(self,  event):
+        for i in range(len(self.record_types)):
+            self.types_multi_choice.Check(i)
+
+    def clear_all_types(self, event):
+        for i in range(len(self.record_types)):
+            self.types_multi_choice.Check(i, False)
+
+    def select_all_auths(self, event):
+        for i in range(len(self.record_auths)):
+            self.auths_multi_choice.Check(i)
+
+    def clear_all_auths(self, event):
+        for i in range(len(self.record_auths)):
+            self.auths_multi_choice.Check(i, False)
 
     def record_id_changed(self, event):
         if self.record_id_box.GetValue() != "":
@@ -177,13 +200,11 @@ If an ID is entered here, no other search options will be available."""
     def disable_filters(self):
         self.free_text_lbl.Disable()
         self.free_text_box.Disable()
-        self.filters_lbl.Disable()
         self.filters_panel.Disable()
 
     def enable_filters(self):
         self.free_text_lbl.Enable()
         self.free_text_box.Enable()
-        self.filters_lbl.Enable()
         self.filters_panel.Enable()
 
     def close_button_press(self, e):
