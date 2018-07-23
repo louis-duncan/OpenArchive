@@ -3,11 +3,50 @@ import wx.adv
 from wx.lib import sized_controls
 import os
 import subprocess
+import string
 
 import database_io
 import textdistance
 
 __title__ = "OpenArchive"
+
+
+class NumberValidator(wx.Validator):
+    def __init__(self, flag=None, pyVar=None):
+        wx.Validator.__init__(self)
+        self.flag = flag
+        self.Bind(wx.EVT_CHAR, self.on_char)
+
+    def Clone(self):
+        return NumberValidator(self.flag)
+
+    def Validate(self, win):
+        tc = self.GetWindow()
+        val = tc.GetValue()
+
+        for x in val:
+            if x not in string.digits:
+                return False
+
+        return True
+
+    def on_char(self, event):
+        key = event.GetKeyCode()
+
+        if key < wx.WXK_SPACE or key == wx.WXK_DELETE or key > 255:
+            event.Skip()
+            return
+
+        if chr(key) in string.digits:
+            event.Skip()
+            return
+
+        if not wx.Validator.IsSilent():
+            wx.Bell()
+
+        # Returning without calling even.Skip eats the event before it
+        # gets to the text control
+        return
 
 
 class FileLinkPopupMenu(wx.Menu):
@@ -78,13 +117,13 @@ class DetailedSearch(wx.Frame):
         # Add bg panel
         bg_panel = wx.Panel(self, size=(frame_width, frame_height))
 
-        #header = wx.StaticText(bg_panel, label="Detailed Search:")
+        self.previous_id = ""
 
         row_one = wx.BoxSizer(wx.HORIZONTAL)
         # Record ID
         record_id_lbl = wx.StaticText(bg_panel, label="Record ID:")
         row_one.Add(record_id_lbl, flag=wx.ALIGN_CENTRE_VERTICAL | wx.TOP, border=2)
-        self.record_id_box = wx.TextCtrl(bg_panel, size=(50, -1))
+        self.record_id_box = wx.TextCtrl(bg_panel, size=(50, -1), validator=NumberValidator())
         record_id_tip_msg = """Number only.
 If an ID is entered here, no other search options will be available."""
         record_id_tip = wx.ToolTip(record_id_tip_msg)
@@ -142,11 +181,11 @@ If an ID is entered here, no other search options will be available."""
         #row_sizer.AddSpacer(10)
         #row_sizer.Add(header)
         row_sizer.AddSpacer(15)
-        row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
+        row_sizer.Add(wx.Panel(self, size=(430, 1), style=wx.BORDER_SIMPLE, name="line"))
         row_sizer.AddSpacer(15)
         row_sizer.Add(row_one)
         row_sizer.AddSpacer(15)
-        row_sizer.Add(wx.Panel(self, size=(400, 1), style=wx.BORDER_SIMPLE, name="line"))
+        row_sizer.Add(wx.Panel(self, size=(430, 1), style=wx.BORDER_SIMPLE, name="line"))
         row_sizer.AddSpacer(20)
         row_sizer.Add(row_two)
         row_sizer.AddSpacer(10)
@@ -164,6 +203,7 @@ If an ID is entered here, no other search options will be available."""
 
     def create_binds(self):
         # Bind Data Entry
+        self.Bind(wx.EVT_TEXT, self.record_id_changed, self.record_id_box)
 
         # Bind Button Presses
         self.Bind(wx.EVT_BUTTON, self.select_all_types, self.check_all_types_button)
@@ -173,7 +213,6 @@ If an ID is entered here, no other search options will be available."""
 
         # Close Frame
         self.Bind(wx.EVT_CLOSE, self.close_button_press)
-        self.Bind(wx.EVT_TEXT, self.record_id_changed, self.record_id_box)
 
     def select_all_types(self,  event):
         for i in range(len(self.record_types)):
@@ -192,10 +231,23 @@ If an ID is entered here, no other search options will be available."""
             self.auths_multi_choice.Check(i, False)
 
     def record_id_changed(self, event):
+        # Todo: Add validator
+        changed_text = self.record_id_box.GetValue()
+        if changed_text != "":
+            entry_valid = validate_numbers(changed_text)
+            if not entry_valid:
+                self.record_id_box.SetValue(self.previous_id)
+            else:
+                pass
+        else:
+            pass
+
         if self.record_id_box.GetValue() != "":
             self.disable_filters()
         else:
             self.enable_filters()
+
+        self.previous_id = self.record_id_box.GetValue()
 
     def disable_filters(self):
         self.free_text_lbl.Disable()
@@ -207,9 +259,22 @@ If an ID is entered here, no other search options will be available."""
         self.free_text_box.Enable()
         self.filters_panel.Enable()
 
-    def close_button_press(self, e):
+    def close_button_press(self, event):
         self.Destroy()
         pass
+
+
+def validate_numbers(text):
+    assert type(text) == str
+    valid = True
+    try:
+        int(text)
+    except ValueError:
+        if text == "":
+            valid = None
+        else:
+            valid = False
+    return valid
 
 
 def main(title=__title__):
