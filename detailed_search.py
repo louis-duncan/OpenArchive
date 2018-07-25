@@ -364,14 +364,21 @@ If an ID is entered here, no other search options will be available."""
             print("Not Quick Search")
             wx_start_date = self.start_date.GetValue()
             wx_end_date = self.end_date.GetValue()
-            start_date = datetime.datetime(wx_start_date.GetYear(),
+            try:
+                start_date = datetime.datetime(wx_start_date.GetYear(),
                                            wx_start_date.GetMonth() + 1,
                                            wx_start_date.GetDay(),
                                            )
-            end_date = datetime.datetime(wx_end_date.GetYear(),
-                                         wx_end_date.GetMonth() + 1,
-                                         wx_end_date.GetDay(),
-                                         )
+            except AssertionError:
+                start_date = None
+            try:
+                end_date = datetime.datetime(wx_end_date.GetYear(),
+                                             wx_end_date.GetMonth() + 1,
+                                             wx_end_date.GetDay(),
+                                             )
+            except AssertionError:
+                end_date = None
+
             return Search(None,
                           self.free_text_box.GetValue(),
                           self.types_multi_choice.GetCheckedStrings(),
