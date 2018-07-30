@@ -14,6 +14,8 @@ import shutil
 from sql import SQL
 
 # Initialise the random module
+import coord
+
 random.seed(str(os.environ["USERNAME"] + str(datetime.datetime.now())))
 
 __title__ = "OpenArchive"
@@ -996,27 +998,81 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         return "OperationalError"
 
 
-def search_archive(text="", resource_type=None, local_auth=None, start_date=None, end_date=None):
+def overlap(start1, end1, start2, end2):
+    """Does the range (start1, end1) overlap with (start2, end2)?"""
+    return end1 >= start2 and end2 >= start1
+
+
+def search_archive(text="", resource_types=list(), local_auths=list(), start_date=None, end_date=None,
+                   longitude=None, latitude=None, radius=None):
+    """resource_types and local_auths should be lists of ints,
+start_date and end_date should be int seconds from EPOCH,
+latitude, longitude, and radius should be floats."""
     # Only retrieve results in the resource and auth brackets.
-    if (resource_type is None) and (local_auth is None):
-        base_list = db_all("SELECT * FROM resources", [])
-    elif (resource_type is not None) and (local_auth is None):
-        base_list = db_all("SELECT * FROM resources WHERE record_type=?", [resource_type, ])
-    elif (resource_type is None) and (local_auth is not None):
-        base_list = db_all("SELECT * FROM resources WHERE local_auth=?", [local_auth, ])
+    base_list = db_all("SELECT * FROM resources WHERE record_type IN ? and local_auth IN ?",
+                       (resource_types, local_auths))
+
+    if base_list is False:
+        raise ConnectionError("Connection to the database timed out.")
+
+    filtered_results = []
+    if start_date is None:
+        search_start_date = end_date
     else:
-        base_list = db_all("SELECT * FROM resources WHERE local_auth=? AND record_type=?",
-                              (local_auth, resource_type))
-    # Todo: Add catch for "base_list is False" caused by failed connection.
+        search_start_date = start_date
+    if end_date is None:
+        search_end_date = start_date
+    else:
+        search_end_date = end_date
+    for r in base_list:
+        keep = True
+        # Date Check
+        if search_start_date is end_date is None:
+            pass
+        else:
+            if r.start_date is None:
+                record_start_date = r.end_date
+            else:
+                record_start_date = r.start_date
+            if r.end_date is None:
+                record_end_date = r.start_date
+            else:
+                record_end_date = r.end_date
+            if record_start_date is record_end_date is None:
+                keep = False
+            else:
+                in_date_range = overlap(record_start_date, record_end_date,
+                                        search_start_date, search_end_date)
+                if in_date_range:
+                    pass
+                else:
+                    keep = False
+        # Location Check
+        if None in (latitude, longitude):
+            pass
+        else:
+            if None in (r.longitude, r.latitude):
+                keep = False
+            else:
+                distance = coord.distance((longitude, latitude), (r.longitude, r.latitude))
+                if distance > radius:
+                    keep = False
+                else:
+                    pass
+        if keep:
+            filtered_results.append(r)
+        else:
+            pass
+
     if (len(str(text)) != 0) and (text is not None):
-        scored_results = score_results(base_list, text)
-        if resource_type is local_auth is start_date is end_date is None:
+        scored_results = score_results(filtered_results, text)
+        if (len(resource_types) == len(local_auths) == 0) and (start_date is end_date is longitude is latitude is None):
             print("No search limits, suspected quick search, showing top 50.")
             return scored_results[0:50]
         else:
             return scored_results
     else:
-        return base_list
+        return filtered_results
 
 
 def move_file_to_archive(cached_path=""):
