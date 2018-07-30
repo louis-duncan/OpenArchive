@@ -6,6 +6,9 @@ import subprocess
 import string
 import collections
 import datetime
+import database_io
+import record_editor
+import record_list_viewer
 
 import database_io
 import textdistance
@@ -343,7 +346,19 @@ If an ID is entered here, no other search options will be available."""
     def search(self, event=None):
         print("Search")
         search_data = self.gather_data()
-        print(search_data)
+        found_records = []
+        if search_data.record_id is not None:
+            r = database_io.get_record_by_id(search_data.record_id)
+            if r is not None:
+                found_records.append(r)
+        else:
+            pass
+
+        if len(found_records) == 1:
+            result_frame = record_editor.RecordEditor(self, __title__, found_records[0])
+        else:
+            results_frame = record_list_viewer.RecordListViewer(self, __title__, found_records)
+
 
     def gather_data(self):
         Search = collections.namedtuple("Search",
