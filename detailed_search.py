@@ -6,6 +6,8 @@ import subprocess
 import string
 import collections
 import datetime
+
+import coord
 import database_io
 import record_editor
 import record_list_viewer
@@ -14,6 +16,10 @@ import database_io
 import textdistance
 
 __title__ = "OpenArchive"
+
+
+class ValidationError(Exception):
+    pass
 
 
 class NumberValidator(wx.Validator):
@@ -52,49 +58,6 @@ class NumberValidator(wx.Validator):
         # Returning without calling even.Skip eats the event before it
         # gets to the text control
         return
-
-
-class FileLinkPopupMenu(wx.Menu):
-    def __init__(self, parent, file_path=""):
-        self.parent = parent
-        wx.Menu.__init__(self)
-
-        self.file_path = file_path
-
-        item = wx.MenuItem(self, wx.NewId(), "Show in archived location...")
-        self.Append(item)
-        self.Bind(wx.EVT_MENU, self.on_archive_open, item)
-
-        item = wx.MenuItem(self, wx.NewId(), "Create merge request")
-        self.Append(item)
-        self.Bind(wx.EVT_MENU, self.on_create_merge, item)
-
-    def on_archive_open(self, event):
-        try:
-            if os.path.exists(self.file_path):
-                pass
-            else:
-                raise FileNotFoundError
-            subprocess.Popen(r'explorer /select,"{}"'.format(os.path.abspath(self.file_path)))
-        except FileNotFoundError:
-            dlg = wx.MessageDialog(self.parent, "Could Not Load File!\n"
-                                                "\n"
-                                                "The files could not be found at location:\n"
-                                                "{}".format(self.file_path),
-                                   "OpenArchive - File Error")
-            dlg.ShowModal()
-            dlg.Destroy()
-
-    def on_create_merge(self, event):
-        pass
-        # Todo: Add merge request creation.
-        dlg = wx.MessageDialog(self.parent, "Inactive Feature!\n"
-                                            "\n"
-                                            "Merge requests are not currently in operation.\n"
-                                            "Please contact your database admin.",
-                               __title__)
-        dlg.ShowModal()
-        dlg.Destroy()
 
 
 class LoadingDialog(wx.lib.sized_controls.SizedDialog):
@@ -359,7 +322,6 @@ If an ID is entered here, no other search options will be available."""
         else:
             results_frame = record_list_viewer.RecordListViewer(self, __title__, found_records)
 
-
     def gather_data(self):
         Search = collections.namedtuple("Search",
                                         "record_id free_text types auths start_date end_date latitude longitude radius")
@@ -377,13 +339,41 @@ If an ID is entered here, no other search options will be available."""
                           )
         else:
             print("Not Quick Search")
+
+            if "" not in (self.longitude_box.GetValue().strip(), self.latitude_box.GetValue().strip()):
+                position_valid = coord.validate("{}, {}".format(self.longitude_box.GetValue(),
+                                                                self.latitude_box.GetValue()))
+                if not position_valid:
+                    dlg = wx.MessageDialog(self, "Invalid Coordinates!\n\nThe lon/lat entered are not valid.",
+                                           style=wx.OK | wx.CENTRE | wx.ICON_ERROR)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    raise ValidationError("Lat/Lon Invalid")
+                else:
+                    longitude, latitude = coord.normalise("{}, {}".format(self.longitude_box.GetValue(),
+                                                                          self.latitude_box.GetValue()))
+            else:
+                longitude = latitude = None
+            record_types = database_io.return_types()
+            local_auths = database_io.return_local_authorities()
+
+            checked_types = self.types_multi_choice.GetCheckedStrings()
+            type_ids = []
+            for t in checked_types:
+                type_ids.append(record_types.index(t))
+
+            checked_auths = self.auths_multi_choice.GetCheckedStrings()
+            auth_ids = []
+            for a in checked_auths:
+                auth_ids.append(local_auths.index(a))
+
             wx_start_date = self.start_date.GetValue()
             wx_end_date = self.end_date.GetValue()
             try:
                 start_date = datetime.datetime(wx_start_date.GetYear(),
-                                           wx_start_date.GetMonth() + 1,
-                                           wx_start_date.GetDay(),
-                                           )
+                                               wx_start_date.GetMonth() + 1,
+                                               wx_start_date.GetDay(),
+                                               )
             except AssertionError:
                 start_date = None
             try:
@@ -396,12 +386,12 @@ If an ID is entered here, no other search options will be available."""
 
             return Search(None,
                           self.free_text_box.GetValue(),
-                          self.types_multi_choice.GetCheckedStrings(),
-                          self.auths_multi_choice.GetCheckedStrings(),
+                          type_ids,
+                          auth_ids,
                           start_date,
                           end_date,
-                          self.latitude_box.GetValue(),
-                          self.longitude_box.GetValue(),
+                          latitude,
+                          longitude,
                           self.radius_spinner.GetValue(),
                           )
 

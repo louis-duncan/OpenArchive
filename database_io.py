@@ -1009,27 +1009,32 @@ def search_archive(text="", resource_types=list(), local_auths=list(), start_dat
 start_date and end_date should be int seconds from EPOCH,
 latitude, longitude, and radius should be floats."""
     # Only retrieve results in the resource and auth brackets.
-    base_query = "SELECT * FROM resources WHERE "
+    base_query = "SELECT * FROM resources WHERE"
+    # Todo: Remove WHERE where unbounded search.
 
     types_filters = ""
     for t in resource_types:
         if len(types_filters) != 0:
             types_filters += " OR "
-        types_filters += "local_auth={}".format(t)
+        types_filters += "record_type={}".format(t)
 
     if types_filters != "":
-        types_filters = "({})".format(types_filters)
+        types_filters = " ({})".format(types_filters)
+        base_query += types_filters
 
     auths_filters = ""
     for a in local_auths:
         if len(auths_filters) != 0:
             auths_filters += " OR "
-        auths_filters += "record_type={}".format(t)
+        auths_filters += "local_auth={}".format(a)
 
+    if auths_filters != "":
+        auths_filters = " ({})".format(auths_filters)
+        if types_filters != "":
+            base_query += " AND"
+        base_query += auths_filters
 
-
-    base_list = db_all("SELECT * FROM resources WHERE record_type IN ? and local_auth IN ?",
-                       (resource_types, local_auths))
+    base_list = db_all(base_query, list())
 
     if base_list is False:
         raise ConnectionError("Connection to the database timed out.")
@@ -1050,13 +1055,13 @@ latitude, longitude, and radius should be floats."""
             pass
         else:
             if r.start_date is None:
-                record_start_date = r.end_date
+                record_start_date = r.end_date / 1000
             else:
-                record_start_date = r.start_date
+                record_start_date = r.start_date / 1000
             if r.end_date is None:
-                record_end_date = r.start_date
+                record_end_date = r.start_date / 1000
             else:
-                record_end_date = r.end_date
+                record_end_date = r.end_date / 1000
             if record_start_date is record_end_date is None:
                 keep = False
             else:
