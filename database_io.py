@@ -1009,6 +1009,25 @@ def search_archive(text="", resource_types=list(), local_auths=list(), start_dat
 start_date and end_date should be int seconds from EPOCH,
 latitude, longitude, and radius should be floats."""
     # Only retrieve results in the resource and auth brackets.
+    base_query = "SELECT * FROM resources WHERE "
+
+    types_filters = ""
+    for t in resource_types:
+        if len(types_filters) != 0:
+            types_filters += " OR "
+        types_filters += "local_auth={}".format(t)
+
+    if types_filters != "":
+        types_filters = "({})".format(types_filters)
+
+    auths_filters = ""
+    for a in local_auths:
+        if len(auths_filters) != 0:
+            auths_filters += " OR "
+        auths_filters += "record_type={}".format(t)
+
+
+
     base_list = db_all("SELECT * FROM resources WHERE record_type IN ? and local_auth IN ?",
                        (resource_types, local_auths))
 
