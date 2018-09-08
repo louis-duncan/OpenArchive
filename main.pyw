@@ -66,15 +66,6 @@ class LaunchPad(wx.Frame):
 
         self.Show()
 
-        try:
-            database_io.init()
-        except database_io.DatabaseError:
-            self.database_error_dlg()
-        try:
-            backup.check_and_backup()
-        except database_io.DatabaseError:
-            self.database_error_dlg()
-
         msg = """- Welcome to OpenArchive -
 
         Database File:
@@ -201,6 +192,10 @@ def main(title):
 if __name__ == "__main__":
     print("PID:",os.getpid())
     print("PPID:",os.getppid())
+    try:
+        database_io.init()
+    except database_io.ConfigLoadError as e:
+        exit()
     main(__title__)
 else:
     pass

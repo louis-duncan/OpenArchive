@@ -24,26 +24,40 @@ __title__ = "OpenArchive"
 invalid_chars = ""
 
 # Config Path
-LOCAL_CONFIG = os.path.join(os.environ["LOCALAPPDATA"], "OpenArchive\\local_config.cfg")
-TEMPLATE_LOCAL_CONFIG = ".\\cfg\\template_local_config.cfg"
-GLOBAL_CONFIG = ".\\cfg\\global_config.cfg"
+APPDATA = os.path.join(os.environ["APPDATA"], "OpenArchive")
+CONFIG_FILE = os.path.join(APPDATA, "config.cfg")
 
-# Root path of the repo.
-ARCHIVE_LOCATION_ROOT = os.path.abspath(".\\New")
 # Path of the sql database file.
-DATABASE_LOCATION = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))
+DATABASE_LOCATION = None  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))
+# Root path of the repo.
+ARCHIVE_LOCATION_ROOT = None  # os.path.abspath(".\\New")
 # The sub directory in which OpenArchive will place new uploaded content.
-ARCHIVE_LOCATION_SUB = os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
+ARCHIVE_LOCATION_SUB = None  # os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 # Directories in which files are left in place and not copied to the archive when linked.
 ARCHIVE_INCLUDED_DIRS = []
 # Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
 # Start DateTime from which all database dates are calculated as a difference.
-BACKUPS_DIR = os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "backups"))
+BACKUPS_DIR = None  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "backups"))
+
 EPOCH = datetime.datetime(1970, 1, 1)
+
+if os.path.exists(APPDATA):
+    pass
+else:
+    os.mkdir(APPDATA)
+
+if os.path.exists(TEMP_DATA_LOCATION):
+    pass
+else:
+    os.mkdir(TEMP_DATA_LOCATION)
 
 
 class DatabaseError(Exception):
+    pass
+
+
+class ConfigLoadError(Exception):
     pass
 
 
@@ -53,7 +67,8 @@ class ArchiveRecord:
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
                  start_date=None, end_date=None, physical_ref="", other_ref="", new_tags=[], linked_files=[],
-                 longitude=None, latitude=None, thumb_files=[], created_by=None, created_time=None, last_changed_by=None,
+                 longitude=None, latitude=None, thumb_files=[], created_by=None, created_time=None,
+                 last_changed_by=None,
                  last_changed_time=None):
         self.record_id = record_id
         self.title = title
@@ -108,7 +123,7 @@ class ArchiveRecord:
             self.physical_ref,
             self.other_ref,
             self.string_tags(),
-            )
+        )
 
     def launch_file(self, file_index=0, file_path=None, cache_dir=TEMP_DATA_LOCATION):
         if (self.linked_files is None) and (file_path is None):
@@ -229,122 +244,172 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 
 def load_config():
-    global LOCAL_CONFIG, TEMPLATE_LOCAL_CONFIG, GLOBAL_CONFIG, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION, BACKUPS_DIR
+    global CONFIG_FILE, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, \
+        ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, BACKUPS_DIR
 
-    local_config = {"GLOBAL_CONFIG": GLOBAL_CONFIG,
-                    "TEMP_DATA_LOCATION": TEMP_DATA_LOCATION,
-                    }
+    config_file_exists = os.path.exists(CONFIG_FILE)
 
-    formatted_incs = ""
-    for i in ARCHIVE_INCLUDED_DIRS:
-        formatted_incs += i + "|"
-    formatted_incs = formatted_incs.strip("|")
-    global_config = {"DATABASE_LOCATION": DATABASE_LOCATION,
-                     "ARCHIVE_LOCATION_ROOT": ARCHIVE_LOCATION_ROOT,
-                     "ARCHIVE_LOCATION_SUB": ARCHIVE_LOCATION_SUB,
-                     "ARCHIVE_INCLUDED_DIRS": formatted_incs,
-                     }
+    if config_file_exists:
+        # Load config file, raise error is config is invalid.
+        with open(CONFIG_FILE, "r") as fh:
+            config_lines = fh.readlines()
 
-    # Load local config
-    print("Loading local config at", LOCAL_CONFIG, "...")
-    try:
-        with open(LOCAL_CONFIG, "r") as file:
-            local_config_lines = file.readlines()
-    except FileNotFoundError:
-        with open(TEMPLATE_LOCAL_CONFIG, "r") as file:
-            local_config_lines = file.readlines()
+        config_dict = {}
+        for l in config_lines:
+            if l.strip().startswith("#"):
+                pass
+            else:
+                parts = l.split("=")
+                if len(parts) < 2:
+                    raise ConfigLoadError("Invalid line: {}".format(l))
+                else:
+                    for p in range(len(parts)):
+                        parts[p] = parts[p].strip().upper()
+                    config_dict[parts[0]] = parts[1]
 
-    for l in local_config_lines:
-        v_name, v_value = l.split("=", 1)
-        v_name = v_name.strip()
-        v_value = v_value.strip()
-        if v_value == "":
-            pass
+        if config_dict == {}:
+            raise ConfigLoadError("No Parameters Found")
         else:
-            try:
-                t = local_config[v_name]
-                local_config[v_name] = v_value
-            except KeyError:
-                print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
+            pass
 
-    # Format the read data
-    local_config["GLOBAL_CONFIG"] = os.path.abspath(local_config["GLOBAL_CONFIG"])
-    local_config["TEMP_DATA_LOCATION"] = os.path.abspath(local_config["TEMP_DATA_LOCATION"])
+        test_config(config_dict)
 
-    # Set values
-    GLOBAL_CONFIG = local_config["GLOBAL_CONFIG"]
-    TEMP_DATA_LOCATION = local_config["TEMP_DATA_LOCATION"]
+    else:
+        msg = "No config to load.\n" \
+              "\n" \
+              "Select Config:\n" \
+              "Locate a pre-existing config file which will be copied to this machine.\n" \
+              "\n" \
+              "Create Config:\n" \
+              "Create a config from scratch; choose the database and set the folders OpenArchive will use"
+        choices = ["Select Config",
+                   "Create Config",
+                   "Cancel"]
+        choice = easygui.buttonbox(msg, __title__ + " - No Config", choices)
+        if choice == "Cancel":
+            raise ConfigLoadError("User Quit")
+        elif choice == choices[0]:
+            new_config = easygui.fileopenbox("", __title__ + " - Select Config", "config.cfg",
+                                             ("*.*", "*.cfg"))
+            if new_config is None:
+                raise ConfigLoadError("User Quit")
+            else:
+                pass
 
-    # Re-write the config file
+            shutil.copy(new_config, CONFIG_FILE)
+
+            raise ConfigLoadError("No Config File")
+        elif choice == choices[1]:
+            valid = False
+            entries = []
+            while not valid:
+                fields = ["DATABASE_LOCATION =",
+                          "ARCHIVE_LOCATION_ROOT =",
+                          "ARCHIVE_LOCATION_SUB =",
+                          "ARCHIVE_INCLUDED_DIRS ( | separated) =",
+                          "BACKUPS_DIR ="
+                          ]
+                entries = easygui.multenterbox("Enter Values:", __title__ + " - New Config", fields)
+                if entries is None:
+                    raise ConfigLoadError("User Quit")
+                else:
+                    config_dict = {"DATABASE_LOCATION": entries[0],
+                                   "ARCHIVE_LOCATION_ROOT": entries[1],
+                                   "ARCHIVE_LOCATION_SUB": entries[2],
+                                   "ARCHIVE_INCLUDED_DIRS": entries[3],
+                                   "BACKUPS_DIR": entries[4]}
+                    try:
+                        test_config(config_dict)
+                        valid = True
+                    except ConfigLoadError as e:
+                        msg = "Failed to load config:\n{}".format(e.args[0])
+                        easygui.msgbox(msg, "OpenArchive - Config Error")
+            new_config_text = """DATABASE_LOCATION={}
+ARCHIVE_LOCATION_ROOT={}
+ARCHIVE_LOCATION_SUB={}
+ARCHIVE_INCLUDED_DIRS={}
+BACKUPS_DIR={}""".format(entries[0], entries[1], entries[2], entries[3], entries[4])
+            with open(CONFIG_FILE, "w") as fh:
+                fh.write(new_config_text)
+        else:
+            raise ConfigLoadError("User Quit")
+
+
+def test_config(config_dict):
+    global CONFIG_FILE, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, \
+        ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, BACKUPS_DIR
     try:
-        os.mkdir(os.path.dirname(LOCAL_CONFIG))
-    except FileExistsError:
+        DATABASE_LOCATION = config_dict["DATABASE_LOCATION"]
+    except KeyError:
+        raise ConfigLoadError("Missing DATABASE_LOCATION")
+    if not os.path.exists(DATABASE_LOCATION):
+        raise ConfigLoadError("Cannot Locate DATABASE_LOCATION: {}".format(DATABASE_LOCATION))
+    else:
         pass
-    with open(LOCAL_CONFIG, "w") as file:
-        lines = []
-        for v in local_config:
-            lines.append("{} = {}\n".format(v, local_config[v]))
-        file.writelines(lines)
-
-    print("Loading global config...")
-    # Load global config
-    try:
-        with open(GLOBAL_CONFIG, "r") as file:
-            global_config_lines = file.readlines()
-    except FileNotFoundError:
-        global_config_lines = []
-
-    for l in global_config_lines:
-        v_name, v_value = l.split("=", 1)
-        v_name = v_name.strip()
-        v_value = v_value.strip()
-        try:
-            t = global_config[v_name]
-            global_config[v_name] = v_value
-        except KeyError:
-            print("Ignoring unexpected parameter: {} = {}".format(v_name, v_value))
-
-    # Format the read data
-    global_config["DATABASE_LOCATION"] = os.path.abspath(global_config["DATABASE_LOCATION"])
-    global_config["ARCHIVE_LOCATION_ROOT"] = os.path.abspath(global_config["ARCHIVE_LOCATION_ROOT"])
-    global_config["ARCHIVE_LOCATION_SUB"] = os.path.abspath(global_config["ARCHIVE_LOCATION_SUB"])
-    listed_incs = []
-    for p in global_config["ARCHIVE_INCLUDED_DIRS"].split("|"):
-        sp = p.strip()
-        if sp != "":
-            listed_incs.append(os.path.abspath(sp))
-    print("loaded inc dirs:", listed_incs)
-    # Set values
-    DATABASE_LOCATION = global_config["DATABASE_LOCATION"]
-    ARCHIVE_LOCATION_ROOT = global_config["ARCHIVE_LOCATION_ROOT"]
-    ARCHIVE_LOCATION_SUB = global_config["ARCHIVE_LOCATION_SUB"]
-    ARCHIVE_INCLUDED_DIRS = listed_incs
-    BACKUPS_DIR = os.path.join(os.path.abspath(ARCHIVE_LOCATION_ROOT), "backups")
-
-    # Re-write the config file
-    try:
-        os.mkdir(os.path.dirname(GLOBAL_CONFIG))
-    except FileExistsError:
+    if not os.path.isfile(DATABASE_LOCATION):
+        raise ConfigLoadError("DATABASE_LOCATION: {}\nis not a file.".format(DATABASE_LOCATION))
+    else:
         pass
-    with open(GLOBAL_CONFIG, "w") as file:
-        lines = []
-        for v in global_config:
-            lines.append("{} = {}\n".format(v, global_config[v]))
-        file.writelines(lines)
 
-    print("Local Config: {}\n"
-          "Global Config: {}\n"
-          "Local Temp Files: {}\n"
-          "Database File Location: {}\n"
-          "Repos. Locations: {}\n"
-          "Repos. Sub. Loc.: {}\n"
-          "Other Repo. Dirs.: {}".format(LOCAL_CONFIG,
-                                         GLOBAL_CONFIG,
-                                         TEMP_DATA_LOCATION,
-                                         DATABASE_LOCATION,
-                                         ARCHIVE_LOCATION_ROOT,
-                                         ARCHIVE_LOCATION_SUB,
-                                         ARCHIVE_INCLUDED_DIRS))
+    try:
+        ARCHIVE_LOCATION_ROOT = config_dict["ARCHIVE_LOCATION_ROOT"]
+    except KeyError:
+        raise ConfigLoadError("Missing ARCHIVE_LOCATION_ROOT")
+    if not os.path.exists(ARCHIVE_LOCATION_ROOT):
+        raise ConfigLoadError("Cannot Locate ARCHIVE_LOCATION_ROOT: {}".format(ARCHIVE_LOCATION_ROOT))
+    else:
+        pass
+    if not os.path.isdir(ARCHIVE_LOCATION_ROOT):
+        raise ConfigLoadError("ARCHIVE_LOCATION_ROOT: {}\nis not a directory.".format(ARCHIVE_LOCATION_ROOT))
+    else:
+        pass
+
+    try:
+        ARCHIVE_LOCATION_SUB = config_dict["ARCHIVE_LOCATION_SUB"]
+    except KeyError:
+        raise ConfigLoadError("Missing ARCHIVE_LOCATION_SUB")
+    if not os.path.exists(ARCHIVE_LOCATION_SUB):
+        raise ConfigLoadError("Cannot Locate ARCHIVE_LOCATION_SUB: {}".format(ARCHIVE_LOCATION_SUB))
+    else:
+        pass
+    if not os.path.isdir(ARCHIVE_LOCATION_SUB):
+        raise ConfigLoadError("ARCHIVE_LOCATION_SUB: {}\nis not a directory.".format(ARCHIVE_LOCATION_SUB))
+    else:
+        pass
+
+    try:
+        ARCHIVE_INCLUDED_DIRS = config_dict["ARCHIVE_INCLUDED_DIRS"].split("|")
+    except KeyError:
+        ARCHIVE_INCLUDED_DIRS = None
+    if ARCHIVE_INCLUDED_DIRS is not None:
+        for f in ARCHIVE_INCLUDED_DIRS:
+            if f.strip() == "":
+                pass
+            else:
+                if not os.path.exists(f):
+                    raise ConfigLoadError("Cannot Locate Dir in ARCHIVE_INCLUDED_DIRS: {}".format(f))
+                else:
+                    pass
+                if not os.path.isdir(f):
+                    raise ConfigLoadError("Path in ARCHIVE_INCLUDED_DIRS: {}\nis not a directory."
+                                          .format(f))
+                else:
+                    pass
+    else:
+        pass
+
+    try:
+        BACKUPS_DIR = config_dict["BACKUPS_DIR"]
+    except KeyError:
+        raise ConfigLoadError("Missing BACKUPS_DIR")
+    if not os.path.exists(BACKUPS_DIR):
+        raise ConfigLoadError("Cannot Locate BACKUPS_DIR: {}".format(BACKUPS_DIR))
+    else:
+        pass
+    if not os.path.isdir(BACKUPS_DIR):
+        raise ConfigLoadError("BACKUPS_DIR: {}\nis not a directory.".format(BACKUPS_DIR))
+    else:
+        pass
 
 
 def create_new_database():
@@ -700,9 +765,9 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
         return None
     else:
         record_type_id = db_one("SELECT id FROM types WHERE type_text=?",
-                                       (str(record_obj.record_type),))
+                                (str(record_obj.record_type),))
         local_auth_id = db_one("SELECT id FROM local_authorities WHERE local_auth=?",
-                                      (str(record_obj.local_auth),))
+                               (str(record_obj.local_auth),))
         # Todo: Add catch for "False in (record_type_id, local_auth_id)" cause by failed connection.
 
         record_type_id = int(record_type_id)
@@ -899,14 +964,14 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print("Files to be linked:", files_to_link)
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
             suc = db_run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
-                      'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
-                      'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                      params)
+                         'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
+                         'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                         params)
         else:
             params.append(record_id)
             suc = db_run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
-                      "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
-                      "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
+                         "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
+                         "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
         # Todo: Add check to see if "suc is False" caused by failed connection.
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(db_one("SELECT * FROM resources WHERE last_changed_time=?",
@@ -1157,7 +1222,7 @@ def score_results(results, text):
                 pass
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
         score = round(score, 1)
-        #print(r.id, score)
+        # print(r.id, score)
         if score == 0.0:
             pass
         else:
@@ -1268,47 +1333,22 @@ def open_database_connection() -> SQL:
 
 def init():
     # Main Script
-    try:
-        load_config()
-    except FileNotFoundError:
-        easygui.msgbox("Could not load config at {},\nthe program will close.".format(GLOBAL_CONFIG), "OpenArchive")
-        raise
-
-    if os.path.exists(ARCHIVE_LOCATION_ROOT):
-        pass
-    else:
+    config_loaded = False
+    while not config_loaded:
         try:
-            os.mkdir(ARCHIVE_LOCATION_ROOT)
-        except:
-            easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
-                           "{}\n"
-                           "\n"
-                           "The program will now exit.".format(ARCHIVE_LOCATION_ROOT))
-            raise
+            load_config()
+            config_loaded = True
+        except ConfigLoadError as e:
+            if e.args[0] == "No Config File":
+                pass
+            elif e.args[0] == "User Quit":
+                raise ConfigLoadError("No Config Loaded")
+            else:
+                msg = "Failed to load config:\n{}\n\nOpenArchive will now close.".format(e.args[0])
+                easygui.msgbox(msg, "OpenArchive - Config Error")
+                raise ConfigLoadError("No Config Loaded")
 
-    if os.path.exists(ARCHIVE_LOCATION_SUB):
-        pass
-    else:
-        try:
-            os.mkdir(ARCHIVE_LOCATION_SUB)
-        except:
-            easygui.msgbox("OpenArchiveManager could not access or create a data repository at:\n"
-                           "{}\n"
-                           "\n"
-                           "The program will now exit.".format(ARCHIVE_LOCATION_SUB))
-            raise
-
-    if os.path.exists(TEMP_DATA_LOCATION):
-        pass
-    else:
-        try:
-            os.mkdir(TEMP_DATA_LOCATION)
-        except:
-            easygui.msgbox("OpenArchiveManager could not access or create the temporary data location at:\n"
-                           "{}\n"
-                           "\n"
-                           "The program will now exit.".format(TEMP_DATA_LOCATION), __title__)
-            raise
+    print("Config Loaded!")
 
     try:
         if os.path.exists(DATABASE_LOCATION):
