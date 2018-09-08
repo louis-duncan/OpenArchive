@@ -18,7 +18,7 @@ test_data = None
 
 
 class RecordListViewer(wx.Frame):
-    def __init__(self, parent, title, records):
+    def __init__(self, parent, title, records, current_page=0):
         # Define the headings for later
         self.records = records
 
@@ -100,6 +100,8 @@ class RecordListViewer(wx.Frame):
             if entry[6] == record.tags_prompt:
                 entry[6] = ""
             self.data.append(entry)
+
+
 
         for r in self.data:
             self.dvc.AppendItem(r)

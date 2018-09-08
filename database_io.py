@@ -28,17 +28,17 @@ APPDATA = os.path.join(os.environ["APPDATA"], "OpenArchive")
 CONFIG_FILE = os.path.join(APPDATA, "config.cfg")
 
 # Path of the sql database file.
-DATABASE_LOCATION = None  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))
+DATABASE_LOCATION = ""  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "open_archive.db"))
 # Root path of the repo.
-ARCHIVE_LOCATION_ROOT = None  # os.path.abspath(".\\New")
+ARCHIVE_LOCATION_ROOT = ""  # os.path.abspath(".\\New")
 # The sub directory in which OpenArchive will place new uploaded content.
-ARCHIVE_LOCATION_SUB = None  # os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
+ARCHIVE_LOCATION_SUB = ""  # os.path.join(ARCHIVE_LOCATION_ROOT, "OpenArchive")
 # Directories in which files are left in place and not copied to the archive when linked.
 ARCHIVE_INCLUDED_DIRS = []
 # Directory used for holding local files. Cleared on program exit.
 TEMP_DATA_LOCATION = os.path.abspath(os.path.join(os.environ["TEMP"], "OpenArchive"))
 # Start DateTime from which all database dates are calculated as a difference.
-BACKUPS_DIR = None  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "backups"))
+BACKUPS_DIR = ""  # os.path.abspath(os.path.join(ARCHIVE_LOCATION_ROOT, "backups"))
 
 EPOCH = datetime.datetime(1970, 1, 1)
 
@@ -1068,38 +1068,32 @@ def overlap(start1, end1, start2, end2):
     return end1 >= start2 and end2 >= start1
 
 
+def keyword_search(text=""):
+    with_wild = "%{}%".format(text)
+    params = (with_wild, with_wild)
+    results = db_all("SELECT * FROM resources WHERE title LIKE ? OR description LIKE ?", params)
+    return results
+
+
 def search_archive(text="", resource_types=list(), local_auths=list(), start_date=None, end_date=None,
-                   longitude=None, latitude=None, radius=None):
+                   longitude=None, latitude=None, radius=None, broad_search=False):
     """resource_types and local_auths should be lists of ints,
 start_date and end_date should be int seconds from EPOCH,
 latitude, longitude, and radius should be floats."""
     # Only retrieve results in the resource and auth brackets.
-    base_query = "SELECT * FROM resources WHERE"
-    # Todo: Remove WHERE where unbounded search.
 
-    types_filters = ""
+    place_char = "?"
+    resource_place_holders = ', '.join(place_char for i in resource_types)
+    auth_place_holders = ', '.join(place_char for i in local_auths)
+    all_vals = []
     for t in resource_types:
-        if len(types_filters) != 0:
-            types_filters += " OR "
-        types_filters += "record_type={}".format(t)
+        all_vals.append(t)
+    for s in local_auths:
+        all_vals.append(s)
 
-    if types_filters != "":
-        types_filters = " ({})".format(types_filters)
-        base_query += types_filters
-
-    auths_filters = ""
-    for a in local_auths:
-        if len(auths_filters) != 0:
-            auths_filters += " OR "
-        auths_filters += "local_auth={}".format(a)
-
-    if auths_filters != "":
-        auths_filters = " ({})".format(auths_filters)
-        if types_filters != "":
-            base_query += " AND"
-        base_query += auths_filters
-
-    base_list = db_all(base_query, list())
+    query = "SELECT * FROM resources WHERE record_type IN ({}) AND local_auth IN ({})".format(resource_place_holders,
+                                                                                              auth_place_holders)
+    base_list = db_all(query, all_vals)
 
     if base_list is False:
         raise ConnectionError("Connection to the database timed out.")
@@ -1113,6 +1107,7 @@ latitude, longitude, and radius should be floats."""
         search_end_date = start_date
     else:
         search_end_date = end_date
+
     for r in base_list:
         keep = True
         # Date Check
@@ -1155,8 +1150,8 @@ latitude, longitude, and radius should be floats."""
 
     if (len(str(text)) != 0) and (text is not None):
         scored_results = score_results(filtered_results, text)
-        if (len(resource_types) == len(local_auths) == 0) and (start_date is end_date is longitude is latitude is None):
-            print("No search limits, suspected quick search, showing top 50.")
+        if broad_search:
+            print("Broad Search, showing top 50.")
             return scored_results[0:50]
         else:
             return scored_results
