@@ -22,8 +22,6 @@ class RecordListViewer(wx.Frame):
         # Define the headings for later
         self.records = records
 
-        closing = False
-
         headings = (("ID:", 35),
                     ("Title:", 250),
                     ("Description:", 500),
@@ -37,10 +35,10 @@ class RecordListViewer(wx.Frame):
         total_width = 0
         for h in headings:
             total_width += h[1]
-
         wx.Frame.__init__(self, parent, title=title,
                           size=(total_width + 20, 500), style=wx.DEFAULT_FRAME_STYLE)
 
+        closing = True
         if len(records) == 0:
             dlg = wx.MessageDialog(self, "No Records\n"
                                          "\n"
@@ -49,9 +47,24 @@ class RecordListViewer(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             self.Destroy()
-            closing = True
+            raise Exception("No Records")
         else:
             pass
+
+        page_len = 16
+        self.pages = []
+        new_page = []
+        for i, r in enumerate(records):
+            new_page.append(r)
+            if (i + 1) % page_len == 0:
+                self.pages.append(new_page)
+                new_page = []
+            else:
+                pass
+        if len(new_page) > 0:
+            self.pages.append(new_page)
+
+        self.records = self.pages[current_page]
 
         # Create List Control
         self.dvc = dv.DataViewListCtrl(self,
@@ -101,11 +114,8 @@ class RecordListViewer(wx.Frame):
                 entry[6] = ""
             self.data.append(entry)
 
-
-
         for r in self.data:
             self.dvc.AppendItem(r)
-
 
         # Add columns
         for i, (h, w) in enumerate(headings):
@@ -128,6 +138,11 @@ class RecordListViewer(wx.Frame):
         button_sizer.AddSpacer(5)
         button_sizer.Add(self.kml_button)
 
+        self.previous_page_button = wx.Button(self, wx.NewId(), "<<<", size=(200, 30))
+        button_sizer.AddSpacer(50)
+        button_sizer.Add(self.previous_page_button)
+
+
         sizer.AddSpacer(5)
         sizer.Add(button_sizer, 0)
         sizer.AddSpacer(5)
@@ -139,8 +154,7 @@ class RecordListViewer(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.export_kml, self.kml_button)
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
-        if not closing:
-            self.Show()
+        self.Show()
 
     def record_activated(self, event):
         selection = self.dvc.GetSelection()
