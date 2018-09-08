@@ -67,7 +67,8 @@ class ArchiveRecord:
     # noinspection PyDefaultArgument
     def __init__(self, record_id=0, title="", description="", record_type=None, local_auth=None,
                  start_date=None, end_date=None, physical_ref="", other_ref="", new_tags=[], linked_files=[],
-                 longitude=None, latitude=None, thumb_files=[], created_by=None, created_time=None, last_changed_by=None,
+                 longitude=None, latitude=None, thumb_files=[], created_by=None, created_time=None,
+                 last_changed_by=None,
                  last_changed_time=None):
         self.record_id = record_id
         self.title = title
@@ -122,7 +123,7 @@ class ArchiveRecord:
             self.physical_ref,
             self.other_ref,
             self.string_tags(),
-            )
+        )
 
     def launch_file(self, file_index=0, file_path=None, cache_dir=TEMP_DATA_LOCATION):
         if (self.linked_files is None) and (file_path is None):
@@ -243,8 +244,8 @@ Date is invalid. The format DD/MM/YYYY must be followed."""
 
 
 def load_config():
-    global CONFIG_FILE, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, ARCHIVE_LOCATION_SUB,\
-        ARCHIVE_INCLUDED_DIRS, TEMP_DATA_LOCATION, BACKUPS_DIR
+    global CONFIG_FILE, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, \
+        ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, BACKUPS_DIR
 
     config_file_exists = os.path.exists(CONFIG_FILE)
 
@@ -252,26 +253,26 @@ def load_config():
         # Load config file, raise error is config is invalid.
         with open(CONFIG_FILE, "r") as fh:
             config_lines = fh.readlines()
-            if len(config_lines) > 5:
-                raise ConfigLoadError("Excessive lines in config file.")
-            else:
+
+        config_dict = {}
+        for l in config_lines:
+            if l.strip().startswith("#"):
                 pass
-
-            raise ConfigLoadError("Test")
-
-            config_dict = {}
-            for l in config_lines:
-                if l.strip().startswith("#"):
-                    pass
+            else:
+                parts = l.split("=")
+                if len(parts) < 2:
+                    raise ConfigLoadError("Invalid line: {}".format(l))
                 else:
-                    parts = l.split("=")
-                    if len(parts) < 2:
-                        pass
-                    else:
-                        for p in range(len(parts)):
-                            parts[p] = parts[p].strip()
+                    for p in range(len(parts)):
+                        parts[p] = parts[p].strip().upper()
+                    config_dict[parts[0]] = parts[1]
 
+        if config_dict == {}:
+            raise ConfigLoadError("No Parameters Found")
+        else:
+            pass
 
+        test_config(config_dict)
 
     else:
         msg = "No config to load.\n" \
@@ -299,12 +300,116 @@ def load_config():
 
             raise ConfigLoadError("No Config File")
         elif choice == choices[1]:
-            easygui.msgbox("Creating new config not yet supported")
-            ConfigLoadError("User Quit")
+            valid = False
+            entries = []
+            while not valid:
+                fields = ["DATABASE_LOCATION =",
+                          "ARCHIVE_LOCATION_ROOT =",
+                          "ARCHIVE_LOCATION_SUB =",
+                          "ARCHIVE_INCLUDED_DIRS ( | separated) =",
+                          "BACKUPS_DIR ="
+                          ]
+                entries = easygui.multenterbox("Enter Values:", __title__ + " - New Config", fields)
+                if entries is None:
+                    raise ConfigLoadError("User Quit")
+                else:
+                    config_dict = {"DATABASE_LOCATION": entries[0],
+                                   "ARCHIVE_LOCATION_ROOT": entries[1],
+                                   "ARCHIVE_LOCATION_SUB": entries[2],
+                                   "ARCHIVE_INCLUDED_DIRS": entries[3],
+                                   "BACKUPS_DIR": entries[4]}
+                    try:
+                        test_config(config_dict)
+                        valid = True
+                    except ConfigLoadError as e:
+                        msg = "Failed to load config:\n{}".format(e.args[0])
+                        easygui.msgbox(msg, "OpenArchive - Config Error")
+            new_config_text = """DATABASE_LOCATION={}
+ARCHIVE_LOCATION_ROOT={}
+ARCHIVE_LOCATION_SUB={}
+ARCHIVE_INCLUDED_DIRS={}
+BACKUPS_DIR={}""".format(entries[0], entries[1], entries[2], entries[3], entries[4])
+            with open(CONFIG_FILE, "w") as fh:
+                fh.write(new_config_text)
         else:
-            raise ConfigLoadError("Unknown")
+            raise ConfigLoadError("User Quit")
 
-    assert False is True
+
+def test_config(config_dict):
+    global CONFIG_FILE, ARCHIVE_LOCATION_ROOT, DATABASE_LOCATION, \
+        ARCHIVE_LOCATION_SUB, ARCHIVE_INCLUDED_DIRS, BACKUPS_DIR
+    try:
+        DATABASE_LOCATION = config_dict["DATABASE_LOCATION"]
+    except KeyError:
+        raise ConfigLoadError("Missing DATABASE_LOCATION")
+    if not os.path.exists(DATABASE_LOCATION):
+        raise ConfigLoadError("Cannot Locate DATABASE_LOCATION: {}".format(DATABASE_LOCATION))
+    else:
+        pass
+    if not os.path.isfile(DATABASE_LOCATION):
+        raise ConfigLoadError("DATABASE_LOCATION: {}\nis not a file.".format(DATABASE_LOCATION))
+    else:
+        pass
+
+    try:
+        ARCHIVE_LOCATION_ROOT = config_dict["ARCHIVE_LOCATION_ROOT"]
+    except KeyError:
+        raise ConfigLoadError("Missing ARCHIVE_LOCATION_ROOT")
+    if not os.path.exists(ARCHIVE_LOCATION_ROOT):
+        raise ConfigLoadError("Cannot Locate ARCHIVE_LOCATION_ROOT: {}".format(ARCHIVE_LOCATION_ROOT))
+    else:
+        pass
+    if not os.path.isdir(ARCHIVE_LOCATION_ROOT):
+        raise ConfigLoadError("ARCHIVE_LOCATION_ROOT: {}\nis not a directory.".format(ARCHIVE_LOCATION_ROOT))
+    else:
+        pass
+
+    try:
+        ARCHIVE_LOCATION_SUB = config_dict["ARCHIVE_LOCATION_SUB"]
+    except KeyError:
+        raise ConfigLoadError("Missing ARCHIVE_LOCATION_SUB")
+    if not os.path.exists(ARCHIVE_LOCATION_SUB):
+        raise ConfigLoadError("Cannot Locate ARCHIVE_LOCATION_SUB: {}".format(ARCHIVE_LOCATION_SUB))
+    else:
+        pass
+    if not os.path.isdir(ARCHIVE_LOCATION_SUB):
+        raise ConfigLoadError("ARCHIVE_LOCATION_SUB: {}\nis not a directory.".format(ARCHIVE_LOCATION_SUB))
+    else:
+        pass
+
+    try:
+        ARCHIVE_INCLUDED_DIRS = config_dict["ARCHIVE_INCLUDED_DIRS"].split("|")
+    except KeyError:
+        ARCHIVE_INCLUDED_DIRS = None
+    if ARCHIVE_INCLUDED_DIRS is not None:
+        for f in ARCHIVE_INCLUDED_DIRS:
+            if f.strip() == "":
+                pass
+            else:
+                if not os.path.exists(f):
+                    raise ConfigLoadError("Cannot Locate Dir in ARCHIVE_INCLUDED_DIRS: {}".format(f))
+                else:
+                    pass
+                if not os.path.isdir(f):
+                    raise ConfigLoadError("Path in ARCHIVE_INCLUDED_DIRS: {}\nis not a directory."
+                                          .format(f))
+                else:
+                    pass
+    else:
+        pass
+
+    try:
+        BACKUPS_DIR = config_dict["BACKUPS_DIR"]
+    except KeyError:
+        raise ConfigLoadError("Missing BACKUPS_DIR")
+    if not os.path.exists(BACKUPS_DIR):
+        raise ConfigLoadError("Cannot Locate BACKUPS_DIR: {}".format(BACKUPS_DIR))
+    else:
+        pass
+    if not os.path.isdir(BACKUPS_DIR):
+        raise ConfigLoadError("BACKUPS_DIR: {}\nis not a directory.".format(BACKUPS_DIR))
+    else:
+        pass
 
 
 def create_new_database():
@@ -660,9 +765,9 @@ def format_record_obj_to_sql(record_obj: ArchiveRecord):
         return None
     else:
         record_type_id = db_one("SELECT id FROM types WHERE type_text=?",
-                                       (str(record_obj.record_type),))
+                                (str(record_obj.record_type),))
         local_auth_id = db_one("SELECT id FROM local_authorities WHERE local_auth=?",
-                                      (str(record_obj.local_auth),))
+                               (str(record_obj.local_auth),))
         # Todo: Add catch for "False in (record_type_id, local_auth_id)" cause by failed connection.
 
         record_type_id = int(record_type_id)
@@ -859,14 +964,14 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         print("Files to be linked:", files_to_link)
         if (record_id == 0) or (record_id == "New Record") or (record_id is None):
             suc = db_run('INSERT INTO resources (title, description, record_type, local_auth, start_date, end_date, '
-                      'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
-                      'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                      params)
+                         'physical_ref, other_ref, tags, longitude, latitude, created_by, created_time, last_changed_by, '
+                         'last_changed_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                         params)
         else:
             params.append(record_id)
             suc = db_run("UPDATE resources set title=?, description=?, record_type=?, local_auth=?, start_date=?,"
-                      "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
-                      "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
+                         "end_date=?, physical_ref=?, other_ref=?, tags=?, longitude=?, latitude=?, created_by=?, "
+                         "created_time=?, last_changed_by=?, last_changed_time=? WHERE id=?", params)
         # Todo: Add check to see if "suc is False" caused by failed connection.
         changed_time_stamp = int((record_obj.last_changed_time - EPOCH).total_seconds() * 1000)
         record_obj = format_sql_to_record_obj(db_one("SELECT * FROM resources WHERE last_changed_time=?",
@@ -1117,7 +1222,7 @@ def score_results(results, text):
                 pass
         score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
         score = round(score, 1)
-        #print(r.id, score)
+        # print(r.id, score)
         if score == 0.0:
             pass
         else:
