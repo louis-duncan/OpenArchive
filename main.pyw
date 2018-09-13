@@ -91,6 +91,10 @@ class LaunchPad(wx.Frame):
 
     def keyword_search(self, search_text):
         results = database_io.keyword_search(search_text)
+        if results is None:
+            results = []
+        else:
+            results = database_io.format_sql_to_record_obj(results)
         view_frame = record_list_viewer.RecordListViewer(self, __title__, results)
 
     def detailed_search(self):
