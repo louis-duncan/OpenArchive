@@ -866,6 +866,7 @@ def get_thumbnail(file_link_id=None, file_path=None):
 
 
 def format_search_string(search_string):
+    # Escapes all special char, and add regex for the * and ? as 'any string' and 'any char' respectively.
     special_chars = [".", "^", "$", "+", "{"]
     formatted_string = search_string.upper()
     for c in special_chars:
@@ -1063,6 +1064,18 @@ def commit_record(cached_record_path=None, record_obj: ArchiveRecord = None):
         return "OperationalError"
 
 
+def move_file_to_archive(cached_path=""):
+    new_dir = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
+    new_full_path = os.path.abspath(os.path.join(new_dir, os.path.basename(cached_path)))
+    suc = shutil.copy2(cached_path, new_full_path)
+    if os.path.abspath(cached_path).startswith(os.path.abspath(TEMP_DATA_LOCATION)):
+        os.remove(cached_path)
+        print("Deleting {} from cache.".format(cached_path))
+    else:
+        pass
+    return suc
+
+
 def overlap(start1, end1, start2, end2):
     """Does the range (start1, end1) overlap with (start2, end2)?"""
     return end1 >= start2 and end2 >= start1
@@ -1098,7 +1111,6 @@ latitude, longitude, and radius should be floats."""
     if base_list is False:
         raise ConnectionError("Connection to the database timed out.")
 
-    filtered_results = []
     if start_date is None:
         search_start_date = end_date
     else:
@@ -1108,8 +1120,11 @@ latitude, longitude, and radius should be floats."""
     else:
         search_end_date = end_date
 
+    filtered_results = []
+
     for r in base_list:
         keep = True
+
         # Date Check
         if search_start_date is end_date is None:
             pass
@@ -1122,7 +1137,9 @@ latitude, longitude, and radius should be floats."""
                 record_end_date = r.start_date / 1000
             else:
                 record_end_date = r.end_date / 1000
+
             if record_start_date is record_end_date is None:
+                print("Failed Date Check")
                 keep = False
             else:
                 in_date_range = overlap(record_start_date, record_end_date,
@@ -1130,16 +1147,21 @@ latitude, longitude, and radius should be floats."""
                 if in_date_range:
                     pass
                 else:
+                    print("Failed Date Check")
                     keep = False
+
         # Location Check
         if None in (latitude, longitude):
             pass
         else:
             if None in (r.longitude, r.latitude):
+
+                print("Not lon lat")
                 keep = False
             else:
                 distance = coord.distance((longitude, latitude), (r.longitude, r.latitude))
                 if distance > radius:
+                    print("Too far")
                     keep = False
                 else:
                     pass
@@ -1148,85 +1170,84 @@ latitude, longitude, and radius should be floats."""
         else:
             pass
 
-    if (len(str(text)) != 0) and (text is not None):
-        scored_results = score_results(filtered_results, text)
-        if broad_search:
-            print("Broad Search, showing top 50.")
-            return scored_results[0:50]
-        else:
-            return scored_results
-    else:
-        return filtered_results
+    easygui.msgbox("Base list length is {}.\nFiltered list length is {}.".format(len(base_list), len(filtered_results)))
+
+    scored_results = score_results(filtered_results, text)
+    return scored_results
 
 
-def move_file_to_archive(cached_path=""):
-    new_dir = temp.mkdtemp(prefix="", dir=ARCHIVE_LOCATION_SUB)
-    new_full_path = os.path.abspath(os.path.join(new_dir, os.path.basename(cached_path)))
-    suc = shutil.copy2(cached_path, new_full_path)
-    if os.path.abspath(cached_path).startswith(os.path.abspath(TEMP_DATA_LOCATION)):
-        os.remove(cached_path)
-        print("Deleting {} from cache.".format(cached_path))
-    else:
-        pass
-    return suc
-
-
-def score_results(results, text):
-    scores = []
+def score_results(results, text, cutoff=1):
+    scored_results = []
     for r in results:
-        # Gen score
-        title_similarity = 4 * textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
-        key_words = text.upper().split(" ")
-        # print(text, key_words)
-        if text.upper() not in key_words:
-            key_words.append(text.upper())
-        key_word_hits = 1
-        physical_ref_hit = 1
-        other_ref_hit = 1
-        for k in key_words:
-            formatted = format_search_string(k)
-            if re.search(formatted, r.title.upper()) is not None:
-                key_word_hits += 1
-            else:
-                pass
-            if re.search(formatted, r.description.upper()) is not None:
-                key_word_hits += 1
-            else:
-                pass
-            if r.tags is not None:
-                for t in r.tags:
-                    if re.search(formatted, t.upper()) is not None:
-                        key_word_hits += 1
-                    else:
-                        pass
-            else:
-                pass
-            if r.physical_ref is not None:
-                if re.search(formatted, r.physical_ref) is not None:
-                    physical_ref_hit = 2
-                else:
-                    pass
-            else:
-                pass
-            if r.other_ref is not None:
-                if re.search(formatted, r.other_ref) is not None:
-                    other_ref_hit = 2
-                else:
-                    pass
-            else:
-                pass
-        score = float(title_similarity * key_word_hits * int(physical_ref_hit) * int(other_ref_hit))
-        score = round(score, 1)
-        # print(r.id, score)
-        if score == 0.0:
+        record_score = 0
+
+        search_terms = coord.multi_split(text.upper(),
+                                         (" ",
+                                          ",",
+                                          ":",
+                                          ";",
+                                          "-",
+                                          "/",
+                                          )
+                                         )
+
+        # Title score
+        title_weight = 2
+        record_score += title_weight * textdistance.levenshtein.normalized_similarity(text.upper(), r.title.upper())
+        re_match = re.search(format_search_string(text.upper()), r.title.upper())
+        if re_match is None:
             pass
         else:
-            scores.append((r, score))
-    scores.sort(key=lambda s: s[1])
-    scores.reverse()
+            span = re_match.span()
+            span_score = title_weight * ((span[1] - span[0]) / len(text))
+            record_score += span_score
+
+        # Weightings
+        key_word_hits = 1
+        physical_ref_hit = 2
+        other_ref_hit = 2
+        tag_hit = 2
+
+        # Look for search terms
+        for term in search_terms:
+            regex_t = format_search_string(term)
+
+            # Search description
+            r_match = re.findall(regex_t, r.description.upper())
+            record_score += key_word_hits * len(r_match)
+
+            # Check refs
+            r_match = re.search(regex_t, r.physical_ref.upper())
+            if r_match is None:
+                pass
+            else:
+                record_score += physical_ref_hit
+            r_match = re.search(regex_t, r.other_ref.upper())
+            if r_match is None:
+                pass
+            else:
+                record_score += other_ref_hit
+
+            tags = r.tags.split("|")
+            for tag in tags:
+                r_match = re.search(regex_t, tag)
+                if r_match is None:
+                    pass
+                else:
+                    record_score += tag_hit
+
+        scored_results.append((round(record_score, 2), r))
+
+    scored_results.sort(key=lambda s: s[0])
+    scored_results.reverse()
     final_results = []
-    for sr in scores:
-        final_results.append(sr[0])
+    for sr in scored_results:
+        if sr[0] <= cutoff:
+            pass
+        else:
+            final_results.append(sr[1])
+
+    easygui.msgbox("Total records given to sort: {}\nScored Results: {}".format(len(results),len(final_results)))
     return final_results
 
 
