@@ -122,6 +122,7 @@ If an ID is entered here, no other search options will be available."""
         self.record_types = database_io.return_types()
         self.record_types.sort(key=database_io.float_none_drop_other)
         self.types_multi_choice = wx.CheckListBox(self.filters_panel, size=(300, 80), choices=self.record_types)
+        self.types_multi_choice.SetCheckedItems(range(len(self.record_types)))
         type_sizer.Add(self.types_multi_choice, (0, 0), span=(3, 1))
         self.check_all_types_button = wx.Button(self.filters_panel, label="Select All")
         type_sizer.Add(self.check_all_types_button, (0, 2))
@@ -137,6 +138,7 @@ If an ID is entered here, no other search options will be available."""
         self.record_auths = database_io.return_local_authorities()
         self.record_auths.sort(key=database_io.float_none_drop_other)
         self.auths_multi_choice = wx.CheckListBox(self.filters_panel, size=(300, 80), choices=self.record_auths)
+        self.auths_multi_choice.SetCheckedItems(range(len(self.record_auths)))
         auth_sizer.Add(self.auths_multi_choice, (0, 0), span=(3, 1))
         self.check_all_auths_button = wx.Button(self.filters_panel, label="Select All")
         auth_sizer.Add(self.check_all_auths_button, (0, 2))
@@ -315,7 +317,17 @@ If an ID is entered here, no other search options will be available."""
             if r is not None:
                 found_records.append(r)
         else:
-            pass
+            r = database_io.search_archive(search_data.free_text,
+                                           search_data.types,
+                                           search_data.auths,
+                                           search_data.start_date,
+                                           search_data.end_date,
+                                           search_data.longitude,
+                                           search_data.latitude,
+                                           search_data.radius
+                                           )
+            if r is not None:
+                found_records = database_io.format_sql_to_record_obj(r)
 
         if len(found_records) == 1:
             result_frame = record_editor.RecordEditor(self, __title__, found_records[0])
@@ -339,6 +351,12 @@ If an ID is entered here, no other search options will be available."""
                           )
         else:
             print("Not Quick Search")
+
+            free_text = self.free_text_box.GetValue().strip()
+            if free_text == "":
+                free_text = "*"
+            else:
+                pass
 
             if "" not in (self.longitude_box.GetValue().strip(), self.latitude_box.GetValue().strip()):
                 position_valid = coord.validate("{}, {}".format(self.longitude_box.GetValue(),
@@ -385,14 +403,14 @@ If an ID is entered here, no other search options will be available."""
                 end_date = None
 
             return Search(None,
-                          self.free_text_box.GetValue(),
+                          free_text,
                           type_ids,
                           auth_ids,
                           start_date,
                           end_date,
                           latitude,
                           longitude,
-                          self.radius_spinner.GetValue(),
+                          self.radius_spinner.GetValue() * 1000,  # Convert KM value to meters
                           )
 
     def close_button_press(self, event):
