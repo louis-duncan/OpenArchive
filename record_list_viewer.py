@@ -22,7 +22,24 @@ class RecordListViewer(wx.Frame):
         # Define the headings for later
         self.all_records = records
         self.current_page = current_page
-        self.title = title
+        self.title = "{} - {} records".format(title, len(self.all_records))
+
+        self.headings = (("ID:", 35),
+                         ("Title:", 250),
+                         ("Description:", 500),
+                         ("Type:", 150),
+                         ("Source/Local Auth.:", 150),
+                         ("Date Period:", 150),
+                         ("Tags:", 200),
+                         ("NESW:", 50)
+                         )
+
+        total_width = 0
+        for h in self.headings:
+            total_width += h[1]
+
+        wx.Frame.__init__(self, parent, title=self.title,
+                          size=(total_width + 20, 500), style=wx.DEFAULT_FRAME_STYLE)
 
         if len(records) == 0:
             dlg = wx.MessageDialog(self, "No Records\n"
@@ -37,22 +54,6 @@ class RecordListViewer(wx.Frame):
             pass
 
         assert type(records[0]) == database_io.ArchiveRecord
-
-        self.headings = (("ID:", 35),
-                    ("Title:", 250),
-                    ("Description:", 500),
-                    ("Type:", 150),
-                    ("Source/Local Auth.:", 150),
-                    ("Date Period:", 150),
-                    ("Tags:", 200),
-                    ("NESW:", 50)
-                    )
-
-        total_width = 0
-        for h in self.headings:
-            total_width += h[1]
-        wx.Frame.__init__(self, parent, title=title,
-                          size=(total_width + 20, 500), style=wx.DEFAULT_FRAME_STYLE)
 
         page_len = 16
         self.pages = []
@@ -267,10 +268,9 @@ class RecordListViewer(wx.Frame):
             return None
         else:
             pass
-        all_records = database_io.format_sql_to_record_obj(self.all_records)
-        assert type(all_records[0]) == database_io.ArchiveRecord
+        assert type(self.all_records[0]) == database_io.ArchiveRecord
         points = []
-        for record in all_records:
+        for record in self.all_records:
             # Todo: Add catch for none records. Including removing dead bookmarks.
             assert record is not None
             if None not in (record.latitude, record.longitude):
@@ -280,7 +280,6 @@ class RecordListViewer(wx.Frame):
         kml_load.load_batch(points)
 
     def export_page_kml(self, e):
-        assert type(self.pages[self.current_page]) == database_io.ArchiveRecord
         points = []
         for record in self.pages[self.current_page]:
             # Todo: Add catch for none records. Including removing dead bookmarks.
